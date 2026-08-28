@@ -52,8 +52,14 @@ module.exports = {
   // Server Roles
   roles: [
     {
+      name: '👑ㆍOwner',
+      color: 0xE74C3C, // Crimson Red / Gold
+      hoist: true,
+      permissions: [PermissionFlagsBits.Administrator]
+    },
+    {
       name: 'Admin',
-      color: 0xE74C3C, // Red
+      color: 0xE67E22, // Orange / Red
       hoist: true,
       permissions: [PermissionFlagsBits.Administrator]
     },

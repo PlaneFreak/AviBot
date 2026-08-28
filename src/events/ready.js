@@ -67,6 +67,36 @@ module.exports = {
         // 5. Ensure Role Picker Panels in #🎨ㆍroles
         const rolePickerService = require('../services/rolePickerService');
         await rolePickerService.publishRolePicker(guild).catch(() => {});
+
+        // 6. Log Bot Ready to Staff/Admin Log Channel
+        const adminLogService = require('../services/adminLogService');
+        await adminLogService.logBotReady(guild, client).catch(() => {});
+
+        // 7. Ensure 👑ㆍOwner role exists and is positioned right below the bot role
+        let ownerRole = guild.roles.cache.find(r => r.name === '👑ㆍOwner' || r.name.toLowerCase() === 'owner');
+        if (!ownerRole) {
+          ownerRole = await guild.roles.create({
+            name: '👑ㆍOwner',
+            color: 0xE74C3C,
+            hoist: true,
+            permissions: [PermissionFlagsBits.Administrator],
+            reason: 'Auto-creation of server Owner role'
+          }).catch(() => null);
+          console.log(`👑 Created 👑ㆍOwner role in ${guild.name} (unassigned)`);
+        }
+
+        if (ownerRole) {
+          const botHighestRole = guild.members.me?.roles.highest;
+          if (botHighestRole && botHighestRole.position > 1) {
+            const targetPosition = botHighestRole.position - 1;
+            if (ownerRole.position < targetPosition) {
+              await ownerRole.setPosition(targetPosition, { reason: 'Position Owner role directly below bot role' }).catch(err => {
+                console.warn('Could not set Owner role position:', err.message);
+              });
+              console.log(`👑 Positioned 👑ㆍOwner role at hierarchy position ${targetPosition} (below @${botHighestRole.name})`);
+            }
+          }
+        }
       }
     } catch (err) {
       console.error('Error applying channel configurations on ready:', err.message);

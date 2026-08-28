@@ -193,9 +193,16 @@ module.exports = {
       if (!channel) continue;
 
       const chName = channel.name.toLowerCase();
+      const parentName = channel.parent ? channel.parent.name.toLowerCase() : '';
 
       const isVerify = chName.includes('verify');
-      const isStaff = chName.includes('staff') || chName.includes('mod-log') || chName.includes('admin');
+      const isStaff =
+        chName.includes('staff') ||
+        chName.includes('mod') ||
+        chName.includes('admin') ||
+        chName.includes('appeal') ||
+        parentName.includes('staff') ||
+        (channel.type === ChannelType.GuildCategory && chName.includes('staff'));
       const isJail = chName.includes('jail') || chName.includes('quarantine') || chName.includes('appeal-hub');
 
       // Skip quarantine/jail channels
@@ -245,12 +252,43 @@ module.exports = {
         continue;
       }
 
-      // 3. Staff Channels / Category: Staff only
+      // 3. Staff Channels / Category: Strictly hidden from ALL regular & verified members!
       if (isStaff) {
-        await channel.permissionOverwrites.edit(everyoneRole, { ViewChannel: false }).catch(() => {});
-        await channel.permissionOverwrites.edit(verifiedRole, { ViewChannel: false }).catch(() => {});
-        if (modRole) await channel.permissionOverwrites.edit(modRole, { ViewChannel: true }).catch(() => {});
-        if (adminRole) await channel.permissionOverwrites.edit(adminRole, { ViewChannel: true }).catch(() => {});
+        // Explicitly deny @everyone AND @✈️ㆍVerified from viewing ANY staff channel
+        await channel.permissionOverwrites.edit(everyoneRole, {
+          ViewChannel: false
+        }).catch(() => {});
+
+        await channel.permissionOverwrites.edit(verifiedRole, {
+          ViewChannel: false
+        }).catch(() => {});
+
+        // Check if channel is Admin-Only (e.g. staff-chat, admin-logs, bot-logs)
+        const isAdminOnly = chName.includes('staff-chat') || chName.includes('admin') || chName.includes('bot-log');
+
+        if (adminRole) {
+          await channel.permissionOverwrites.edit(adminRole, {
+            ViewChannel: true,
+            SendMessages: true,
+            ReadMessageHistory: true
+          }).catch(() => {});
+        }
+
+        if (modRole) {
+          if (isAdminOnly) {
+            // Hidden from moderators
+            await channel.permissionOverwrites.edit(modRole, {
+              ViewChannel: false
+            }).catch(() => {});
+          } else {
+            // Visible to moderators (e.g. moderators-chat, appeals, staff-news)
+            await channel.permissionOverwrites.edit(modRole, {
+              ViewChannel: true,
+              SendMessages: true,
+              ReadMessageHistory: true
+            }).catch(() => {});
+          }
+        }
         continue;
       }
 

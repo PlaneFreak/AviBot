@@ -80,6 +80,16 @@ function initDB() {
         level INTEGER DEFAULT 1,
         total_points_earned INTEGER DEFAULT 0,
         total_submissions INTEGER DEFAULT 0,
+        chat_xp INTEGER DEFAULT 0,
+        chat_level INTEGER DEFAULT 1,
+        messages_count INTEGER DEFAULT 0,
+        voice_seconds INTEGER DEFAULT 0,
+        last_message_xp_timestamp INTEGER DEFAULT 0,
+        jp_verified INTEGER DEFAULT 0,
+        jp_username TEXT,
+        jp_photo_count INTEGER DEFAULT 0,
+        jp_acceptance_rate TEXT,
+        jp_verified_at INTEGER,
         PRIMARY KEY(user_id, guild_id)
       );
 
@@ -100,6 +110,20 @@ function initDB() {
     } catch {}
     try {
       db.exec(`ALTER TABLE photo_submissions ADD COLUMN total_rating_sum INTEGER DEFAULT 0;`);
+    } catch {}
+    try {
+      db.exec(`ALTER TABLE user_profiles ADD COLUMN jp_verified INTEGER DEFAULT 0;`);
+      db.exec(`ALTER TABLE user_profiles ADD COLUMN jp_username TEXT;`);
+      db.exec(`ALTER TABLE user_profiles ADD COLUMN jp_photo_count INTEGER DEFAULT 0;`);
+      db.exec(`ALTER TABLE user_profiles ADD COLUMN jp_acceptance_rate TEXT;`);
+      db.exec(`ALTER TABLE user_profiles ADD COLUMN jp_verified_at INTEGER;`);
+    } catch {}
+    try {
+      db.exec(`ALTER TABLE user_profiles ADD COLUMN chat_xp INTEGER DEFAULT 0;`);
+      db.exec(`ALTER TABLE user_profiles ADD COLUMN chat_level INTEGER DEFAULT 1;`);
+      db.exec(`ALTER TABLE user_profiles ADD COLUMN messages_count INTEGER DEFAULT 0;`);
+      db.exec(`ALTER TABLE user_profiles ADD COLUMN voice_seconds INTEGER DEFAULT 0;`);
+      db.exec(`ALTER TABLE user_profiles ADD COLUMN last_message_xp_timestamp INTEGER DEFAULT 0;`);
     } catch {}
 
     console.log(`✅ Connected to SQLite3 Database successfully (${dbPath})`);
@@ -313,6 +337,74 @@ module.exports = {
       LIMIT ?
     `);
     return stmt.all(guildId, limit);
+  },
+
+  addChatXP(userId, guildId, xpToAdd) {
+    if (!db) initDB();
+    const current = this.getUserProfile(userId, guildId);
+    const oldChatXP = current.chat_xp || 0;
+    const oldChatLevel = current.chat_level || 1;
+    const newChatXP = oldChatXP + xpToAdd;
+
+    const levelHelper = require('../utils/levelHelper');
+    const levelData = levelHelper.calculateChatLevelData(newChatXP);
+    const newChatLevel = levelData.level;
+    const now = Math.floor(Date.now() / 1000);
+
+    const stmt = db.prepare(`
+      UPDATE user_profiles
+      SET chat_xp = ?,
+          chat_level = ?,
+          messages_count = messages_count + 1,
+          last_message_xp_timestamp = ?
+      WHERE user_id = ? AND guild_id = ?
+    `);
+    stmt.run(newChatXP, newChatLevel, now, userId, guildId);
+
+    return {
+      previousLevel: oldChatLevel,
+      newLevel: newChatLevel,
+      leveledUp: newChatLevel > oldChatLevel,
+      totalChatXP: newChatXP,
+      levelData
+    };
+  },
+
+  getTopUsersByChatXP(guildId, limit = 10) {
+    if (!db) initDB();
+    const stmt = db.prepare(`
+      SELECT * FROM user_profiles
+      WHERE guild_id = ?
+      ORDER BY chat_xp DESC, chat_level DESC
+      LIMIT ?
+    `);
+    return stmt.all(guildId, limit);
+  },
+
+  setJetPhotosVerification(userId, guildId, data) {
+    if (!db) initDB();
+    this.getUserProfile(userId, guildId); // ensure profile exists
+    const now = Math.floor(Date.now() / 1000);
+    const stmt = db.prepare(`
+      UPDATE user_profiles
+      SET jp_verified = 1,
+          jp_username = ?,
+          jp_photo_count = ?,
+          jp_acceptance_rate = ?,
+          jp_verified_at = ?
+      WHERE user_id = ? AND guild_id = ?
+    `);
+    stmt.run(data.username || null, data.photoCount || 0, data.acceptanceRate || null, now, userId, guildId);
+  },
+
+  getJetPhotosProfile(userId, guildId) {
+    if (!db) initDB();
+    const stmt = db.prepare(`
+      SELECT jp_verified, jp_username, jp_photo_count, jp_acceptance_rate, jp_verified_at
+      FROM user_profiles
+      WHERE user_id = ? AND guild_id = ?
+    `);
+    return stmt.get(userId, guildId) || null;
   },
 
   // --- Suspension / Jail Methods ---

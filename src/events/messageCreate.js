@@ -10,6 +10,9 @@ function formatStickyMessage(content) {
 // In-memory locks to prevent multiple concurrent sticky re-posts
 const stickyLocks = new Set();
 
+// In-memory rate limiter for Chat XP (60-second cooldown per user)
+const chatXpCooldowns = new Map();
+
 module.exports = {
   name: Events.MessageCreate,
   async execute(message, client) {
@@ -471,7 +474,50 @@ module.exports = {
     }
 
     // ----------------------------------------------------
-    // 3. Handle Auto-Repin of Sticky Message on New Messages
+    // 3. Community / Chat Activity XP & Leveling Engine
+    // (Medium-to-Hard scaling, 60s anti-spam cooldown, min 5 chars)
+    // ----------------------------------------------------
+    const isBotOrSystemChannel =
+      channel.name.toLowerCase().includes('welcome') ||
+      channel.name.toLowerCase().includes('verify') ||
+      channel.name.toLowerCase().includes('rules') ||
+      channel.name.toLowerCase().includes('news') ||
+      channel.name.toLowerCase().includes('log') ||
+      channel.name.toLowerCase().includes('appeal');
+
+    if (!isPicRatingChannel && !isBotOrSystemChannel && content.length >= 5 && !content.startsWith('/') && !content.startsWith('!') && !content.startsWith('?')) {
+      const now = Date.now();
+      const lastXpTime = chatXpCooldowns.get(message.author.id) || 0;
+
+      // 60-second cooldown between XP awards per user
+      if (now - lastXpTime >= 60000) {
+        chatXpCooldowns.set(message.author.id, now);
+
+        const xpGained = Math.floor(Math.random() * 11) + 15; // 15 - 25 XP per valid message
+        const db = require('../database/db');
+        const xpResult = db.addChatXP(message.author.id, message.guild.id, xpGained);
+
+        if (xpResult && xpResult.leveledUp) {
+          const levelUpEmbed = new EmbedBuilder()
+            .setColor(config.colors.primary)
+            .setAuthor({
+              name: `Level Up! 🎉`,
+              iconURL: message.author.displayAvatarURL({ dynamic: true })
+            })
+            .setDescription(
+              `Congratulations ${message.author}! You have reached **Chat Activity Level ${xpResult.newLevel}**!\n\n` +
+              `🎖️ **Title:** **${xpResult.levelData.rankTitle}**\n` +
+              `📊 **Progress:** \`${xpResult.levelData.progressBar}\``
+            )
+            .setFooter({ text: `${config.footerText} • Community Leveling` });
+
+          channel.send({ embeds: [levelUpEmbed] }).catch(() => {});
+        }
+      }
+    }
+
+    // ----------------------------------------------------
+    // 4. Handle Auto-Repin of Sticky Message on New Messages
     // ----------------------------------------------------
     const activeSticky = stickyManager.getSticky(channel.id);
     if (activeSticky && !stickyLocks.has(channel.id)) {
