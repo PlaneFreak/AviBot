@@ -6,6 +6,14 @@ jspm_packages/
 .env
 .env.local
 .env.*.local
+*.env
+*.pem
+*.key
+*.cert
+*.pfx
+credentials.json
+token.json
+secret.json
 
 # SQLite Database & data files
 *.sqlite*
