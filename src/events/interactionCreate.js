@@ -81,7 +81,8 @@ module.exports = {
           }));
 
           const currentEmbed = interaction.message.embeds[0];
-          const displayImage = currentEmbed?.image?.url || submission.image_url;
+          const existingAttachment = interaction.message.attachments.first();
+          const displayImage = existingAttachment ? `attachment://${existingAttachment.name}` : (currentEmbed?.image?.url || submission.image_url);
 
           const updatedEmbed = photoRatingHelper.createPhotoEmbed(
             author,

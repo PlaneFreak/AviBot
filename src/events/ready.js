@@ -97,6 +97,23 @@ module.exports = {
             }
           }
         }
+
+        // 8. Ensure 🧪ㆍTester role exists (Slowmode immune)
+        let testerRole = guild.roles.cache.find(r => r.name === '🧪ㆍTester' || r.name.toLowerCase() === 'tester');
+        if (!testerRole) {
+          testerRole = await guild.roles.create({
+            name: '🧪ㆍTester',
+            color: 0x1ABC9C,
+            hoist: false,
+            permissions: [PermissionFlagsBits.ManageMessages],
+            reason: 'Auto-creation of Tester role (Slowmode immunity)'
+          }).catch(() => null);
+          console.log(`🧪 Created 🧪ㆍTester role in ${guild.name} (Slowmode immune)`);
+        }
+
+        // 9. Sync 💎ㆍOG Member role for the first 100 human members
+        const ogRoleService = require('../services/ogRoleService');
+        await ogRoleService.syncOGRolesForGuild(guild).catch(() => {});
       }
     } catch (err) {
       console.error('Error applying channel configurations on ready:', err.message);

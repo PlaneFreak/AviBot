@@ -1,110 +1,175 @@
-# AviBot - Discord Moderation & Server Setup Bot
+# ✈️ AviBot — Advanced Aviation, Planespotting & Discord Community Suite
 
-A modern Discord bot built with **JavaScript (Node.js)** and **discord.js v14**, featuring full moderation tools, automated server setup, rules management, and channel inspection.
+<p align="center">
+  <img src="https://img.shields.io/badge/Node.js-v20%20LTS-green?style=for-the-badge&logo=node.js" alt="Node.js" />
+  <img src="https://img.shields.io/badge/Discord.js-v14.16-blue?style=for-the-badge&logo=discord" alt="Discord.js" />
+  <img src="https://img.shields.io/badge/Database-SQLite3%20WAL-orange?style=for-the-badge&logo=sqlite" alt="SQLite" />
+  <img src="https://img.shields.io/badge/AI%20Vision-Google%20Gemini-8E44AD?style=for-the-badge&logo=google" alt="Google Gemini" />
+  <img src="https://img.shields.io/badge/Hardware-Raspberry%20Pi%205-C51A4A?style=for-the-badge&logo=raspberrypi" alt="Raspberry Pi 5" />
+</p>
 
----
-
-## 🚀 Features
-
-- **Instant Slash Commands**: Configured for instant deployment on your guild (`1524791551820173622`).
-- **Server Setup Automation (`/setup-server`)**: Creates entire server hierarchy (categories, text channels, voice channels, roles, and permissions) and automatically publishes the official rules.
-- **Channel Inspector (`/list-channels`)**: Dumps all server channels and IDs in `"channel-name" | id` format (with optional text file export).
-- **Rules Publisher (`/post-rules`)**: Posts or refreshes styled rules embed into any designated channel.
-- **Interactive Appeal System**:
-  - Automatically attaches a `📝 Submit Appeal` button in user DMs upon `/ban`, `/kick`, or `/timeout`.
-  - Opens a Discord Modal form for users to provide explanations/apologies.
-  - Automatically routes appeals to the `⚖️ㆍappeals` channel (auto-created with staff permissions if missing).
-  - Staff can resolve appeals with 1-click `✅ Accept Appeal` (auto-unbans, lifts timeout, or generates a re-invite link) or `❌ Reject Appeal`.
-- **Utility**:
-  - `/ping` (WebSocket & bot latency)
-  - `/help` (Detailed command guide)
+**AviBot** is a high-performance, feature-packed Discord Bot engineered specifically for **Planespotting Communities, Aviation Enthusiasts, and Flight Simulators**. Powered by **Google Gemini AI Vision**, an interactive **Photo Rating & Leaderboard Engine**, **Dual Community Leveling**, strict **Anti-Raid Isolation**, and **JetPhotos Account Verification**.
 
 ---
 
-## 📋 Prerequisites & Setup
+## 🌟 Key Features
 
-### 1. Discord Developer Portal Setup
-1. Visit [Discord Developer Portal](https://discord.com/developers/applications) and create a **New Application**.
-2. Go to the **Bot** tab:
-   - Click **Add Bot** / **Reset Token** to copy your **Bot Token**.
-   - Enable **Privileged Gateway Intents**:
-     - ✅ **Presence Intent**
-     - ✅ **Server Members Intent**
-     - ✅ **Message Content Intent**
-3. Go to **OAuth2 > URL Generator**:
-   - Scopes: `bot`, `applications.commands`
-   - Bot Permissions: Select `Administrator` (or *Manage Channels*, *Manage Roles*, *Ban Members*, *Kick Members*, *Moderate Members*, *Manage Messages*, *View Channels*, *Send Messages*, *Embed Links*).
-   - Copy the generated URL and invite the bot to your server.
-
-### 2. Configure `.env`
-Open `.env` and fill in your values:
-
-```env
-DISCORD_TOKEN=your_bot_token_here
-CLIENT_ID=your_application_client_id_here
-GUILD_ID=1524791551820173622
-```
-
-> **Note**: Setting `GUILD_ID` ensures that whenever you run `npm run deploy-commands`, all slash commands are registered **instantly** without waiting for Discord's 1-hour global cache propagation!
+### 📸 1. AI-Powered Planespotting Photo Engine (`#pic-rating`)
+- **Gemini Vision AI Analysis**: Every uploaded photo is automatically screened by Google Gemini Vision AI to ensure authentic aviation content (aircraft, cockpits, runways, spotting views). Non-aviation posts are auto-rejected.
+- **Interactive 1–10 Rating System**: Clean 2-row button interface (`1️⃣` to `🔟 (+2 Bonus)`).
+- **Anti-Self-Vote & Double-Vote Guard**: Users cannot vote on their own photos; votes can be changed dynamically.
+- **Permanent In-Memory Image Buffering**: Zero broken Discord CDN links.
 
 ---
 
-## 🛠️ Usage Commands
-
-### Register / Update Slash Commands
-```bash
-npm run deploy-commands
-```
-
-### Deploy Commands & Start/Restart in One Command
-```bash
-npm run restart
-```
-
-### Start the Bot
-```bash
-# Normal Start
-npm start
-
-# Development Mode (auto-restart on file changes)
-npm run dev
-```
+### 🏆 2. Multi-Interval Photo Leaderboards & Spotter XP
+- **Automated Recurring Resets**:
+  - 📅 **Daily (24h)** | 🗓️ **3-Day (72h)** | 📆 **Weekly (7d)** | 🌟 **Monthly (30d)** | 👑 **Yearly (365d)**
+- **Dedicated Channel (`#photo-leaderboard`)**: High-ranking photos are archived and awarded scaled Spotter XP.
+- **Aviation Rank Titles**:
+  - `🛫 Flight Cadet` ➔ `🛩️ Junior Spotter` ➔ `📷 Senior Spotter` ➔ `👨‍✈️ First Officer` ➔ `🎖️ Captain` ➔ `👑 Senior Captain` ➔ `🌌 Aviation Legend`
 
 ---
 
-## 📁 Project Structure
+### 💬 3. Dual Community Activity Leveling System
+- **Independent Chat Leveling**: Separate from photo ratings. Members earn `15–25 XP` per valid chat message.
+- **Balanced "Medium to Hard" Progression**: Exponential scaling prevents easy max-leveling.
+- **Anti-Spam Filter**: 60-second cooldown per user; short spam messages (< 5 chars) & bot commands are ignored.
+- **Activity Badges**: `💬 Passenger` ➔ `🎫 Frequent Flyer` ➔ `🛫 Silver Aviator` ➔ `🌟 Gold Aviator` ➔ `💎 Diamond Aviator` ➔ `👑 Server Legend`.
+- **Commands**: `/rank` (Dual Profile Card) and `/top-chatters` (Activity Leaderboard).
+
+---
+
+### ✈️ 4. AI-Powered JetPhotos Account Verification
+- **Command**: `/jetphotos-verify screenshot:[image]`
+- **Anti-Impersonation Ownership Check**: Google Gemini AI verifies two mandatory criteria in the uploaded dashboard screenshot:
+  1. 🌐 **Full Browser URL Bar**: The uncropped browser address bar must be visible.
+  2. 📊 **Private Acceptance Rate**: Only visible in the photographer's personal logged-in dashboard.
+- **Automated Role Tiers**:
+  - `🏆ㆍJP Pro Spotter`: Unlocked at **150+ accepted photos** (with public celebration shoutout!).
+  - `✈️ㆍJP Spotter`: Unlocked at **1+ accepted photos**.
+
+---
+
+### 🎨 5. Interactive Role Picker (`#roles`)
+- **Multi-Category Dropdown Menus**:
+  1. 🔞 **Age Group** (`Under 18` | `18+`)
+  2. ✈️ **Identity & Passion** (`Planespotter`, `Aviation Enthusiast`, `Real-World Pilot`, `Flight Simmer`)
+  3. 📷 **Camera Brand** (`Sony`, `Canon`, `Nikon`, `Fujifilm`, `Lumix`, `OM System`, `Smartphone`, `Other`)
+  4. 🔭 **Lens Brand** (`Sony GM`, `Canon L`, `Nikkor`, `Sigma`, `Tamron`, `Samyang`, `Kit Glass`)
+  5. 🌍 **Home Continent** (`Europe`, `North America`, `South America`, `Asia`, `Africa`, `Oceania`)
+
+---
+
+### 🛡️ 6. Anti-Raid Isolation & Welcome Routing
+- **Complete Channel Lockdown**: Unverified members (`@everyone`) see ONLY `#welcome` and `#verify`. All other channels are strictly invisible.
+- **Identical Sidebar Naming**: Both the unverified lobby and verified arrivals lounge are named `#👋ㆍwelcome` for a seamless UI transition.
+- **Ghost-Ping Onboarding**: Sends and immediately deletes a join notification to alert new arrivals.
+- **💎 OG Member Automation**: The first 100 human members automatically receive the `💎ㆍOG Member` role (positioned directly above `@✈️ㆍVerified`).
+
+---
+
+### ⚖️ 7. Full Moderation & Quarantine Hub
+- **Commands**: `/warn`, `/timeout`, `/untimeout`, `/kick`, `/softban`, `/ban`, `/unban`, `/clear`, `/full-kick`, `/troll`.
+- **Temporary Quarantine Hub**: Suspends users into an isolated `#appeal-hub` while preserving roles.
+- **Interactive DM Appeal System**: Users can submit appeals with Discord Modals; moderators can resolve with 1-click `Accept` or `Reject`.
+- **Confidential Staff Logs (`#admin-logs`)**: Placed at the bottom of the Staff category, visible only to Administrators.
+
+---
+
+## 📁 Project Architecture
 
 ```
 AviBot/
 ├── src/
 │   ├── commands/
-│   │   ├── moderation/
-│   │   │   ├── ban.js
-│   │   │   ├── clear.js
-│   │   │   ├── kick.js
-│   │   │   ├── timeout.js
-│   │   │   ├── untimeout.js
-│   │   │   └── warn.js
-│   │   ├── setup/
-│   │   │   ├── post-rules.js
-│   │   │   └── setup-server.js
-│   │   └── utility/
-│   │       ├── help.js
-│   │       ├── list-channels.js
-│   │       └── ping.js
+│   │   ├── moderation/       # /ban, /kick, /full-kick, /timeout, /warn, /clear, /troll, ...
+│   │   ├── setup/            # /setup-server, /setup-verify, /post-rules
+│   │   └── utility/          # /rank, /top-spotters, /top-chatters, /jetphotos-verify, /jetphotos, /ping, ...
+│   ├── database/
+│   │   └── db.js             # SQLite3 WAL Mode Database Backend
 │   ├── events/
-│   │   ├── interactionCreate.js
-│   │   └── ready.js
-│   ├── handlers/
-│   │   ├── commandHandler.js
-│   │   └── eventHandler.js
-│   ├── templates/
-│   │   └── serverTemplate.js   <-- Customize your server layout & rules here
-│   ├── config.js
-│   ├── deploy-commands.js
-│   └── index.js
-├── .env.example
-├── .env
-├── package.json
-└── README.md
+│   │   ├── ready.js          # Startup routine, role positions & slowmodes
+│   │   ├── messageCreate.js  # Photo rating interceptor & Chat XP engine
+│   │   ├── interactionCreate.js # Slash commands, buttons & select menus
+│   │   └── guildMemberAdd.js # Ghost-ping & OG Member auto-grant
+│   ├── handlers/             # Command & Event loaders
+│   ├── services/
+│   │   ├── geminiService.js       # Google Gemini Vision AI Image Classifier
+│   │   ├── jetphotosService.js    # JetPhotos Ownership Verification
+│   │   ├── rolePickerService.js   # Interactive Dropdown Role Engine
+│   │   ├── verificationService.js # Anti-Bot Channel Lockdown
+│   │   ├── adminLogService.js     # Confidential Admin Logging
+│   │   ├── ogRoleService.js       # First 100 OG Member Sync
+│   │   └── leaderboardService.js  # Multi-Interval Photo Ranking Engine
+│   ├── utils/                # Level formulas, appeal helpers & photo cards
+│   ├── workers/              # Background workers (leaderboards & punishments)
+│   ├── config.js             # Global bot configuration
+│   ├── deploy-commands.js    # Instant slash command registration
+│   └── index.js              # Main application entry point
+├── .env.example              # Environment template
+├── .gitignore                # Secret & Database protection
+└── package.json              # Dependencies and scripts
 ```
+
+---
+
+## 🚀 Setup & Installation
+
+### 1. Prerequisites
+- **Node.js**: `v20 LTS` or higher
+- **Discord Bot Token** from [Discord Developer Portal](https://discord.com/developers/applications)
+  - Enable **Guilds**, **Guild Members**, and **Message Content** Gateway Intents.
+- **Google Gemini API Key** (Free) from [Google AI Studio](https://aistudio.google.com/app/apikey).
+
+---
+
+### 2. Configuration (`.env`)
+Create a `.env` file in the root directory:
+
+```env
+DISCORD_TOKEN=your_discord_bot_token
+CLIENT_ID=your_bot_client_id
+GUILD_ID=your_target_guild_id
+GEMINI_API_KEY=your_google_gemini_api_key
+```
+
+---
+
+### 3. Install & Start
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Deploy slash commands to Discord
+npm run deploy-commands
+
+# 3. Start the bot
+npm start
+
+# Or deploy & restart in one command:
+npm run restart
+```
+
+---
+
+## 🥧 24/7 Hosting on Raspberry Pi 5 (`systemd`)
+
+AviBot is optimized for Linux ARM64 (Raspberry Pi 5):
+
+```bash
+# 1. Check live status
+sudo systemctl status avibot
+
+# 2. View live logs
+journalctl -u avibot -f
+
+# 3. Restart daemon
+sudo systemctl restart avibot
+```
+
+---
+
+## 📜 License
+Distributed under the **MIT License**. Created with ❤️ for aviation & planespotting communities worldwide.

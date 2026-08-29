@@ -21,8 +21,12 @@ module.exports = {
         await pingMsg.delete().catch(() => {});
         console.log(`👋 Sent and deleted instant welcome ping for ${member.user.tag} in #${welcomeChannel.name}`);
       }
+
+      // Automatically assign 💎ㆍOG Member role if member is within the first 100
+      const ogRoleService = require('../services/ogRoleService');
+      await ogRoleService.checkAndAssignOGOnJoin(member).catch(() => {});
     } catch (err) {
-      console.error('Error sending instant welcome notification:', err);
+      console.error('Error in guildMemberAdd handler:', err);
     }
   }
 };

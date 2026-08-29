@@ -106,6 +106,20 @@ module.exports = {
       ]
     },
     {
+      name: '🧪ㆍTester',
+      color: 0x1ABC9C, // Teal
+      hoist: false,
+      permissions: [
+        PermissionFlagsBits.ManageMessages // Grants Slowmode Immunity
+      ]
+    },
+    {
+      name: '💎ㆍOG Member',
+      color: 0x00E5FF, // Diamond Cyan
+      hoist: true,
+      permissions: []
+    },
+    {
       name: 'Aviator',
       color: 0x3498DB, // Blue
       hoist: false,
