@@ -120,6 +120,24 @@ module.exports = {
       permissions: []
     },
     {
+      name: '⭐ㆍVIP',
+      color: 0xF1C40F, // Gold Amber
+      hoist: true,
+      permissions: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.AddReactions,
+        PermissionFlagsBits.AttachFiles,
+        PermissionFlagsBits.EmbedLinks,
+        PermissionFlagsBits.UseExternalEmojis,
+        PermissionFlagsBits.UseExternalStickers,
+        PermissionFlagsBits.Connect,
+        PermissionFlagsBits.Speak,
+        PermissionFlagsBits.PrioritySpeaker
+      ]
+    },
+    {
       name: 'Aviator',
       color: 0x3498DB, // Blue
       hoist: false,
@@ -202,10 +220,16 @@ module.exports = {
           rateLimitPerUser: 3
         },
         {
+          name: '📤ㆍphoto-submit',
+          type: ChannelType.GuildText,
+          topic: 'Submit your planespotting & aviation photos here! Approved photos are published to #pic-rating.',
+          rateLimitPerUser: 900 // 15-minute slowmode
+        },
+        {
           name: '📷ㆍpic-rating',
           type: ChannelType.GuildText,
-          topic: 'Constructive critique, feedback, and ratings on aviation photography.',
-          rateLimitPerUser: 900 // 15-minute slowmode
+          topic: 'Official Planespotter photo ratings! Vote 1-10 on submissions from #photo-submit.',
+          readOnly: true
         },
         {
           name: '❓ㆍjetphotos',

@@ -291,7 +291,7 @@ module.exports = {
       }
     }
 
-    if (type === 'ban') {
+    if (type === 'ban' || type === 'jail') {
       await guild.members.ban(userId, { reason: `Quarantine expired / Appeal rejected: ${reason}` }).catch(() => {});
     } else {
       const member = await guild.members.fetch(userId).catch(() => null);

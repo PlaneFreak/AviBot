@@ -83,51 +83,35 @@ module.exports = {
   async logBotReady(guild, client) {
     try {
       const channel = await this.getOrCreateAdminLogChannel(guild);
-      if (!channel) return;
-
       const now = Math.floor(Date.now() / 1000);
-
-      const readyEmbed = new EmbedBuilder()
-        .setColor(0x2ECC71) // Bright Green
-        .setTitle('🟢 Bot Started & Ready (Restart Complete)')
-        .setDescription(
-          `**AviBot** is fully initialized and operational after restart!\n\n` +
-          `All event listeners, background workers, security locks, and slash commands are live.`
-        )
-        .addFields(
-          {
-            name: '⚡ System Status',
-            value: '`ONLINE & OPERATIONAL`',
-            inline: true
-          },
-          {
-            name: '⏱️ Boot Timestamp',
-            value: `<t:${now}:F>\n(<t:${now}:R>)`,
-            inline: true
-          },
-          {
-            name: '📊 Target Guild',
-            value: `**${guild.name}** (\`${guild.memberCount}\` members)`,
-            inline: true
-          },
-          {
-            name: '🛡️ Active Systems',
-            value:
-              '• 🔒 Anti-Bot 1-Click Verification & Isolation\n' +
-              '• ⏱️ 3-Second Chat Slowmodes & 15m Pic Slowmode\n' +
-              '• 🎨 Interactive Role Picker in `#roles`\n' +
-              '• 🏆 Multi-Interval Photo Leaderboards Worker\n' +
-              '• 🤖 Gemini Vision Aviation & JetPhotos Verification\n' +
-              '• 💬 Dual Leveling Engine (Activity + Spotter)',
-            inline: false
-          }
-        )
-        .setFooter({ text: `${config.footerText} • Confidential Admin Logs` })
-        .setTimestamp();
+      const componentsV2 = require('../utils/componentsV2');
+      const container = componentsV2.createContainer({
+        accentColor: 0x2ECC71, // Green
+        components: [
+          componentsV2.createSection({
+            text:
+              `# 🟢 Bot Started & Ready (Restart Complete)\n\n` +
+              `**AviBot** is fully initialized and operational after restart!\n` +
+              `All event listeners, background workers, security locks, and slash commands are live.\n\n` +
+              `**⚡ System Status:** \`ONLINE & OPERATIONAL\`\n` +
+              `**⏱️ Boot Timestamp:** <t:${now}:F> (<t:${now}:R>)\n` +
+              `**📊 Target Guild:** **${guild.name}** (\`${guild.memberCount}\` members)\n\n` +
+              `### 🛡️ Active Systems\n` +
+              `• 🔒 Anti-Bot 1-Click Verification & Isolation\n` +
+              `• 🪤 Automated Honeypot Trap (#do-not-type)\n` +
+              `• ⏱️ Chat Slowmodes & 15m Pic Slowmode\n` +
+              `• 🎨 Interactive Role Picker in #roles\n` +
+              `• 🏆 Multi-Interval Photo Leaderboards Worker\n` +
+              `• 🤖 Gemini Vision Aviation & JetPhotos Verification\n` +
+              `• 💬 Dual Leveling Engine (Activity + Spotter)`,
+            accessory: componentsV2.createThumbnail('https://cdn-icons-png.flaticon.com/512/190/190411.png')
+          })
+        ]
+      });
 
       // ALWAYS SEND A BRAND-NEW MESSAGE
-      await channel.send({ embeds: [readyEmbed] });
-      console.log(`🛡️ Admin restart log published in #${channel.name} (${guild.name})`);
+      await componentsV2.sendToChannel(client, channel.id, [container]);
+      console.log(`🛡️ Admin restart log published in #${channel.name} (${guild.name}) (Components V2)`);
     } catch (err) {
       console.error('Failed to send admin log:', err.message);
     }

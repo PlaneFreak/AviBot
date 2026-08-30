@@ -111,11 +111,102 @@ module.exports = {
     const content = message.content.trim();
 
     // ----------------------------------------------------
+    // 0.1 Security Honeypot Check (Instant 5-Day Jail & Ban Sequence)
+    // ----------------------------------------------------
+    const honeypotService = require('../services/honeypotService');
+    const isHoneypot = await honeypotService.handleMessage(message);
+    if (isHoneypot) return;
+
+    // ----------------------------------------------------
     // Fun Feature: 10-minute Photo Troll Responder
     // ----------------------------------------------------
     const trollTracker = require('../data/trollTracker');
 
-    // Handle ?troll @user command
+    // ----------------------------------------------------
+    // Anti-Spam Security Check (Deletes flood/duplicate/invite spam & auto-timeouts)
+    // ----------------------------------------------------
+    const antiSpamService = require('../services/antiSpamService');
+    const isSpam = await antiSpamService.handleMessage(message);
+    // Check for ?addxp command (?addxp @user <amount> [spotter|chat])
+    if (content.toLowerCase().startsWith('?addxp')) {
+      if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers) && !message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return message.reply({ content: '❌ You need **Moderator** or **Administrator** permissions to add XP.' })
+          .then(msg => setTimeout(() => msg.delete().catch(() => {}), 5000));
+      }
+
+      const args = content.split(/\s+/).slice(1);
+      const target = message.mentions.users.first() || (args[0] ? await client.users.fetch(args[0].replace(/[<@!>]/g, '')).catch(() => null) : null);
+
+      if (!target) {
+        return message.reply({ content: '⚠️ **Usage:** `?addxp @user <amount> [spotter|chat]`' })
+          .then(msg => setTimeout(() => msg.delete().catch(() => {}), 6000));
+      }
+
+      const rawAmount = args.find((a, i) => i > 0 && /^\d+$/.test(a)) || args[1];
+      const amount = parseInt(rawAmount, 10);
+
+      if (!amount || isNaN(amount) || amount <= 0) {
+        return message.reply({ content: '❌ Please specify a valid XP amount greater than 0: `?addxp @user 500`' })
+          .then(msg => setTimeout(() => msg.delete().catch(() => {}), 6000));
+      }
+
+      const isChatType = args.some(a => a.toLowerCase() === 'chat');
+      const db = require('../database/db');
+      const levelHelper = require('../utils/levelHelper');
+      const componentsV2 = require('../utils/componentsV2');
+
+      let totalXP = 0;
+      let newLevel = 1;
+      let rankTitle = '';
+      let progressBar = '';
+      let categoryName = '';
+
+      if (isChatType) {
+        const result = db.addChatXP(target.id, message.guild.id, amount);
+        totalXP = result.totalChatXP;
+        newLevel = result.newLevel;
+        rankTitle = result.levelData.rankTitle;
+        progressBar = result.levelData.progressBar;
+        categoryName = '💬 Chat Activity XP';
+      } else {
+        const result = db.addXP(target.id, message.guild.id, amount);
+        totalXP = result.totalXP;
+        newLevel = result.newLevel;
+        const levelData = levelHelper.calculateLevelData(totalXP);
+        rankTitle = levelData.rankTitle;
+        progressBar = levelData.progressBar;
+        categoryName = '📸 Spotter XP';
+      }
+
+      const container = componentsV2.createContainer({
+        accentColor: config.colors.primary,
+        components: [
+          componentsV2.createSection({
+            text:
+              `# ✨ XP Successfully Awarded\n\n` +
+              `**Recipient:** ${target} (\`${target.tag}\`)\n` +
+              `**Amount Added:** **+${amount.toLocaleString()} XP** (${categoryName})\n` +
+              `**New Total XP:** **${totalXP.toLocaleString()} XP**\n` +
+              `**Current Level:** **Level ${newLevel}** — *${rankTitle}*\n` +
+              `**Progress:** \`${progressBar}\`\n\n` +
+              `*Awarded by ${message.author}*`,
+            accessory: target.displayAvatarURL ? componentsV2.createThumbnail(target.displayAvatarURL({ dynamic: true })) : null
+          })
+        ]
+      });
+
+      await componentsV2.sendToChannel(client, channel.id, [container]);
+      return;
+    }
+
+    // Check for ?event command (Interactive Event Creation Wizard)
+    if (content.toLowerCase().startsWith('?event')) {
+      const eventService = require('../services/eventService');
+      await eventService.handleEventWizard(message);
+      return;
+    }
+
+    // Check for ?troll command (Fun Photo Responder)
     if (content.toLowerCase().startsWith('?troll') || content.toLowerCase().startsWith('?untroll')) {
       if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers) && !message.member.permissions.has(PermissionFlagsBits.Administrator)) {
         return;
@@ -142,11 +233,29 @@ module.exports = {
     }
 
     // ----------------------------------------------------
-    // Photo Rating System: Intercept uploads in #pic-rating
+    // Photo Submission & Rating System
+    // Submissions are posted in #📤ㆍphoto-submit (15m slowmode)
+    // Rating voting cards are published to #📷ㆍpic-rating (read-only)
     // ----------------------------------------------------
-    const isPicRatingChannel = channel.id === '1524791955111018526' || channel.name.toLowerCase().includes('pic-rating');
+    const isPhotoSubmitChannel = channel.name.toLowerCase().includes('photo-submit') || channel.name.toLowerCase().includes('submit-photo');
+    const isPicRatingChannel = channel.name.toLowerCase().includes('pic-rating');
 
-    if (isPicRatingChannel) {
+    // 1. If someone tries to chat in #pic-rating (which is bot-only)
+    if (isPicRatingChannel && !message.author.bot) {
+      if (!message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
+        await message.delete().catch(() => {});
+        const allChans = await message.guild.channels.fetch();
+        const submitCh = allChans.find(c => c && (c.name.toLowerCase().includes('photo-submit') || c.name.toLowerCase().includes('submit-photo')));
+        const notice = await channel.send({
+          content: `ℹ️ ${message.author}, chatting is disabled in #${channel.name}. Please upload photos in ${submitCh || '#photo-submit'} and vote using the rating buttons below photos!`
+        });
+        setTimeout(() => notice.delete().catch(() => {}), 6000);
+        return;
+      }
+    }
+
+    // 2. Photo Submission in #photo-submit
+    if (isPhotoSubmitChannel) {
       const imageAttachment = message.attachments.find(att =>
         (att.contentType && att.contentType.startsWith('image/')) ||
         /\.(png|jpe?g|webp|gif)$/i.test(att.name)
@@ -159,104 +268,98 @@ module.exports = {
       if (!targetImageUrl) {
         await message.delete().catch(() => {});
         const warnMsg = await channel.send({
-          content: `⚠️ ${message.author}, only **aviation photo submissions** are allowed in #${channel.name}. Text messages without pictures are automatically removed.`
+          content: `⚠️ ${message.author}, only **aviation photos** can be submitted in #${channel.name}. Text messages without pictures are automatically removed.`
         });
         setTimeout(() => warnMsg.delete().catch(() => {}), 6000);
         return;
       }
 
-      const { AttachmentBuilder } = require('discord.js');
       const photoRatingHelper = require('../utils/photoRatingHelper');
       const db = require('../database/db');
       const geminiService = require('../services/geminiService');
+      const componentsV2 = require('../utils/componentsV2');
 
-      // Extract any user caption (removing the image url if it was text)
+      // Add temporary clock reaction
+      await message.react('⏳').catch(() => {});
+
+      // Extract any user caption
       let caption = message.content;
       if (urlMatch) {
         caption = caption.replace(urlMatch[0], '').trim();
       }
-
-      let files = [];
-      let embedImage = targetImageUrl;
-
-      if (imageAttachment) {
-        try {
-          const res = await fetch(imageAttachment.url);
-          if (res.ok) {
-            const arrayBuffer = await res.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
-            const safeName = (imageAttachment.name || 'photo.png').replace(/[^a-zA-Z0-9._-]/g, '_');
-            const fileName = `spotter_${Date.now()}_${safeName}`;
-            const attachment = new AttachmentBuilder(buffer, { name: fileName });
-            files.push(attachment);
-            embedImage = `attachment://${fileName}`;
-          }
-        } catch (fetchErr) {
-          console.error('Error fetching image attachment buffer:', fetchErr);
-        }
-      }
-
-      // Build photo card & disabled rating buttons during pending verification
-      const photoEmbed = photoRatingHelper.createPhotoEmbed(message.author, embedImage, caption);
-      const disabledButtons = photoRatingHelper.createRatingButtons(true);
-
-      const cardMessage = await channel.send({
-        content: `⏳ **Upload Pending...** *(Verifying aviation content with Gemini AI...)*`,
-        embeds: [photoEmbed],
-        files: files,
-        components: disabledButtons
-      });
-
-      // Delete raw user message AFTER sending the new card
-      await message.delete().catch(() => {});
-
-      const permanentImageUrl = cardMessage.attachments.first()?.url || targetImageUrl;
-
-      // Save in SQLite DB
-      db.createPhotoSubmission({
-        messageId: cardMessage.id,
-        channelId: channel.id,
-        userId: message.author.id,
-        guildId: message.guild.id,
-        imageUrl: permanentImageUrl,
-        caption: caption
-      });
 
       // ----------------------------------------------------
       // Gemini Vision AI: Aviation Content Check
       // ----------------------------------------------------
       try {
         const isAviation = await geminiService.isAviationImage(
-          permanentImageUrl,
+          targetImageUrl,
           imageAttachment ? imageAttachment.contentType : 'image/jpeg'
         );
 
         if (!isAviation) {
           console.log(`🚫 [Gemini Filter] Image by ${message.author.tag} in #${channel.name} was rejected as non-aviation.`);
-          
-          // Delete photo card and remove from SQLite
-          await cardMessage.delete().catch(() => {});
-          db.deletePhotoSubmission(cardMessage.id);
+          await message.reactions.removeAll().catch(() => {});
+          await message.react('❌').catch(() => {});
 
           const rejMsg = await channel.send({
-            content: `🚫 ${message.author}, your submission was removed because Gemini AI did not detect any **aviation content** (aircraft, cockpits, runways, airports, or plane spotting). Please only post aviation pictures in #${channel.name}!`
+            content: `🚫 ${message.author}, your submission was removed because Gemini AI did not detect any **aviation content** (aircraft, cockpits, runways, airports, or plane spotting). Please only post aviation pictures!`
           });
-          setTimeout(() => rejMsg.delete().catch(() => {}), 8000);
-        } else {
-          // Gemini approved: Enable rating buttons & update status
-          const enabledButtons = photoRatingHelper.createRatingButtons(false);
-          await cardMessage.edit({
-            content: `📸 **New Spotter Photo by ${message.author}**`,
-            components: enabledButtons
-          }).catch(() => {});
+          setTimeout(async () => {
+            await rejMsg.delete().catch(() => {});
+            await message.delete().catch(() => {});
+          }, 8000);
+          return;
         }
-      } catch (aiErr) {
-        console.error('Error during Gemini aviation content check:', aiErr);
-        const enabledButtons = photoRatingHelper.createRatingButtons(false);
-        await cardMessage.edit({
-          content: `📸 **New Spotter Photo by ${message.author}**`,
-          components: enabledButtons
-        }).catch(() => {});
+
+        // Gemini approved: Mark with green checkmark
+        await message.reactions.removeAll().catch(() => {});
+        await message.react('✅').catch(() => {});
+
+        // Find #pic-rating channel
+        const guildChannels = await message.guild.channels.fetch();
+        const picRatingTarget = guildChannels.find(
+          c => c && c.type === ChannelType.GuildText && c.name.toLowerCase().includes('pic-rating')
+        );
+
+        if (!picRatingTarget) {
+          return message.reply({ content: '❌ Target rating channel `#pic-rating` could not be found.' });
+        }
+
+        // Build Components V2 Rating Container for #pic-rating
+        const ratingContainer = photoRatingHelper.createPhotoContainer(
+          message.author,
+          targetImageUrl,
+          caption,
+          { totalPoints: 0, voteCount: 0, averageRating: '0.0' },
+          false,
+          null,
+          message.url
+        );
+
+        const cardMessage = await componentsV2.sendToChannel(
+          client,
+          picRatingTarget.id,
+          [ratingContainer]
+        );
+
+        // Save in SQLite DB
+        db.createPhotoSubmission({
+          messageId: cardMessage.id,
+          channelId: picRatingTarget.id,
+          userId: message.author.id,
+          guildId: message.guild.id,
+          imageUrl: targetImageUrl,
+          caption: caption
+        });
+
+        // Confirmation in #photo-submit
+        const confirmNotice = await channel.send({
+          content: `✅ ${message.author}, your spotter photo was approved by Gemini AI and published to ${picRatingTarget} for community rating!`
+        });
+        setTimeout(() => confirmNotice.delete().catch(() => {}), 8000);
+      } catch (err) {
+        console.error('Error screening or publishing photo submission:', err);
       }
 
       return;

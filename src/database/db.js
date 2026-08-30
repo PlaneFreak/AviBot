@@ -99,6 +99,16 @@ function initDB() {
         last_run_timestamp INTEGER NOT NULL,
         PRIMARY KEY(key, guild_id)
       );
+
+      CREATE TABLE IF NOT EXISTS invite_allowances (
+        user_id TEXT NOT NULL,
+        guild_id TEXT NOT NULL,
+        allowed_count INTEGER DEFAULT 0,
+        created_by TEXT,
+        reason TEXT,
+        updated_at INTEGER DEFAULT (strftime('%s', 'now')),
+        PRIMARY KEY(user_id, guild_id)
+      );
     `);
 
     // Auto-migrations for existing tables
@@ -500,5 +510,57 @@ module.exports = {
     const stmt = db.prepare(`DELETE FROM stickies WHERE channel_id = ?`);
     const info = stmt.run(channelId);
     return info.changes > 0;
+  },
+
+  // --- Invite Allowance Methods (Paid Ads & Partnerships) ---
+
+  setAllowedInvites(userId, guildId, count, createdBy = null, reason = 'Paid Advertisement / Partnership') {
+    if (!db) initDB();
+    const stmt = db.prepare(`
+      INSERT INTO invite_allowances (user_id, guild_id, allowed_count, created_by, reason, updated_at)
+      VALUES (?, ?, ?, ?, ?, strftime('%s', 'now'))
+      ON CONFLICT(user_id, guild_id) DO UPDATE SET
+        allowed_count = excluded.allowed_count,
+        created_by = excluded.created_by,
+        reason = excluded.reason,
+        updated_at = excluded.updated_at
+    `);
+    stmt.run(userId, guildId, count, createdBy, reason);
+  },
+
+  getAllowedInvites(userId, guildId) {
+    if (!db) initDB();
+    const stmt = db.prepare(`SELECT * FROM invite_allowances WHERE user_id = ? AND guild_id = ?`);
+    const row = stmt.get(userId, guildId);
+    return row ? row.allowed_count : 0;
+  },
+
+  useAllowedInvite(userId, guildId) {
+    if (!db) initDB();
+    const current = this.getAllowedInvites(userId, guildId);
+    if (current <= 0) return 0;
+    const nextCount = Math.max(0, current - 1);
+    const stmt = db.prepare(`
+      UPDATE invite_allowances 
+      SET allowed_count = ?, updated_at = strftime('%s', 'now') 
+      WHERE user_id = ? AND guild_id = ?
+    `);
+    stmt.run(nextCount, userId, guildId);
+    return nextCount;
+  },
+
+  getHoneypotTriggerCount(guildId) {
+    if (!db) initDB();
+    try {
+      const stmt = db.prepare(`
+        SELECT COUNT(*) as count FROM punishments
+        WHERE guild_id = ? AND (reason LIKE '%Honeypot%' OR reason LIKE '%do-not-type%')
+      `);
+      const res = stmt.get(guildId);
+      return res ? res.count : 0;
+    } catch (err) {
+      console.error('Error getting honeypot count:', err);
+      return 0;
+    }
   }
 };

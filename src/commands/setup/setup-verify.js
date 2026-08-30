@@ -1,10 +1,11 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const config = require('../../config');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('setup-verify')
-    .setDescription('Posts the official server verification message with a Verify button')
+    .setDescription('Posts the official server verification message with a Verify button (Components V2)')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .setDMPermission(false)
     .addChannelOption(option =>
@@ -17,50 +18,46 @@ module.exports = {
     .addRoleOption(option =>
       option
         .setName('role')
-        .setDescription('Role to grant upon verification (defaults to Aviator role)')
+        .setDescription('Role to grant upon verification (defaults to Verified role)')
         .setRequired(false)
     ),
 
   async execute(interaction) {
     const targetChannel = interaction.options.getChannel('channel') || interaction.channel;
     const specifiedRole = interaction.options.getRole('role');
+    const defaultRole = specifiedRole || interaction.guild.roles.cache.find(r => r.name.toLowerCase().includes('verified') || r.name.toLowerCase() === 'aviator');
 
-    const defaultRole = specifiedRole || interaction.guild.roles.cache.find(r => r.name.toLowerCase() === 'aviator' || r.name.toLowerCase() === 'member');
+    const roleName = defaultRole ? defaultRole.name : 'Verified';
+    const roleId = defaultRole ? defaultRole.id : 'auto';
 
-    const verifyEmbed = new EmbedBuilder()
-      .setColor(config.colors.primary)
-      .setTitle('🛫 Welcome & Server Verification')
-      .setDescription(
-        `Welcome to **${interaction.guild.name}**!\n\n` +
-        'To gain full access to all channels, photo sharing, and voice lounges, please click the **Verify & Enter** button below.\n\n' +
-        '**Before verifying, please ensure you have read our server rules in `#📜ㆍrules`.**'
-      )
-      .addFields(
-        {
-          name: '🛡️ Member Access',
-          value: defaultRole ? `Grants the **@${defaultRole.name}** role automatically.` : 'Grants full server access.',
-          inline: false
-        }
-      )
-      .setFooter({ text: `${config.footerText} • 1-Click Verification` })
-      .setTimestamp();
+    const container = componentsV2.createContainer({
+      accentColor: config.colors.primary,
+      components: [
+        componentsV2.createSection({
+          text:
+            `# 🛫 Welcome & Server Verification\n\n` +
+            `Welcome to **${interaction.guild.name}**!\n\n` +
+            `To gain full access to all channels, planespotting feeds, flight sim lounges, and community discussions, please click the **Verify & Enter** button below.\n\n` +
+            `**🛡️ Member Access:** Grants the **@${roleName}** role immediately.\n` +
+            `*Before verifying, please ensure you have read our server rules in #📜ㆍrules.*`,
+          accessory: componentsV2.createThumbnail('https://cdn-icons-png.flaticon.com/512/3125/3125713.png')
+        }),
+        componentsV2.createActionRow([
+          componentsV2.createButton({
+            customId: `verify_member_${roleId}`,
+            label: 'Verify & Enter',
+            style: 3, // Success green
+            emoji: '✅'
+          })
+        ])
+      ]
+    });
 
-    const buttonRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`verify_member_${defaultRole ? defaultRole.id : 'auto'}`)
-        .setLabel('Verify & Enter')
-        .setStyle(ButtonStyle.Success)
-        .setEmoji('✅')
-    );
+    await componentsV2.sendToChannel(interaction.client, targetChannel.id, [container]);
 
-    await targetChannel.send({ embeds: [verifyEmbed], components: [buttonRow] });
-
-    const replyEmbed = new EmbedBuilder()
-      .setColor(config.colors.success)
-      .setTitle(`${config.emojis.success} Verification Panel Created`)
-      .setDescription(`The verification panel was successfully published to ${targetChannel}.`)
-      .setFooter({ text: config.footerText });
-
-    await interaction.reply({ embeds: [replyEmbed], ephemeral: true });
+    return interaction.reply({
+      content: `✅ Verification panel successfully published to ${targetChannel} using Components V2!`,
+      flags: 64
+    });
   }
 };

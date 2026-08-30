@@ -196,6 +196,8 @@ module.exports = {
       const parentName = channel.parent ? channel.parent.name.toLowerCase() : '';
 
       const isVerify = chName.includes('verify');
+      const isHoneypot = chName.includes('do-not-type') || chName.includes('trap');
+      const isVipChannel = chName.includes('vip') || parentName.includes('vip') || (channel.type === ChannelType.GuildCategory && chName.includes('vip'));
       const isStaff =
         chName.includes('staff') ||
         chName.includes('mod') ||
@@ -205,8 +207,24 @@ module.exports = {
         (channel.type === ChannelType.GuildCategory && chName.includes('staff'));
       const isJail = chName.includes('jail') || chName.includes('quarantine') || chName.includes('appeal-hub');
 
-      // Skip quarantine/jail channels
-      if (isJail) continue;
+      // Skip quarantine/jail and VIP lounge channels
+      if (isJail || isVipChannel) continue;
+
+      // Honeypot Trap Channel: Visible and typeable for everyone so the trap triggers
+      if (isHoneypot) {
+        await channel.permissionOverwrites.edit(everyoneRole, {
+          ViewChannel: true,
+          ReadMessageHistory: true,
+          SendMessages: true
+        }).catch(() => {});
+
+        await channel.permissionOverwrites.edit(verifiedRole, {
+          ViewChannel: true,
+          ReadMessageHistory: true,
+          SendMessages: true
+        }).catch(() => {});
+        continue;
+      }
 
       // 1. Verify Channel: Visible ONLY to unverified, hidden to verified
       if (isVerify) {
@@ -298,9 +316,32 @@ module.exports = {
         ViewChannel: false
       }).catch(() => {});
 
-      await channel.permissionOverwrites.edit(verifiedRole, {
-        ViewChannel: true
-      }).catch(() => {});
+      const isReadOnlyForMembers =
+        chName.includes('pic-rating') ||
+        chName.includes('rules') ||
+        chName.includes('roles') ||
+        chName.includes('news') ||
+        chName.includes('leaderboard') ||
+        chName.includes('events');
+
+      if (isReadOnlyForMembers) {
+        await channel.permissionOverwrites.edit(verifiedRole, {
+          ViewChannel: true,
+          ReadMessageHistory: true,
+          SendMessages: false,
+          AddReactions: false,
+          CreatePublicThreads: false,
+          CreatePrivateThreads: false
+        }).catch(() => {});
+      } else {
+        await channel.permissionOverwrites.edit(verifiedRole, {
+          ViewChannel: true,
+          ReadMessageHistory: true,
+          SendMessages: true,
+          AttachFiles: true,
+          EmbedLinks: true
+        }).catch(() => {});
+      }
     }
 
     console.log(`✅ Strict verification permissions successfully applied in ${guild.name}!`);
@@ -450,39 +491,50 @@ module.exports = {
 
     // Check if verify panel already exists
     const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
-    const hasPanel = messages && messages.some(m => m.author.id === guild.client.user.id && m.embeds.length > 0);
+    let hasPanel = false;
+    if (messages && messages.size > 0) {
+      for (const [, msg] of messages) {
+        if (msg.author.id === guild.client.user.id) {
+          if (msg.flags.has(32768)) {
+            hasPanel = true;
+          } else {
+            await msg.delete().catch(() => {});
+          }
+        }
+      }
+    }
 
     if (hasPanel) return;
 
-    const embed = new EmbedBuilder()
-      .setColor(config.colors.primary)
-      .setTitle('🛡️ Anti-Bot & Member Verification')
-      .setDescription(
-        `Welcome to **${guild.name}**!\n\n` +
-        `To protect our community from raid bots and automated spam accounts, please click the **Verify & Enter** button below.\n\n` +
-        `**What happens next?**\n` +
-        `• You will receive the **@✈️ㆍVerified** role.\n` +
-        `• All chat, photo sharing, voice lounges, and spotting channels will unlock immediately!`
-      )
-      .addFields(
-        {
-          name: '📜 Community Agreement',
-          value: 'By verifying, you agree to treat other members with respect and follow server guidelines.',
-          inline: false
-        }
-      )
-      .setFooter({ text: `${config.footerText} • 1-Click Verification System` })
-      .setTimestamp();
+    const componentsV2 = require('../utils/componentsV2');
+    const container = componentsV2.createContainer({
+      accentColor: config.colors.primary,
+      components: [
+        componentsV2.createSection({
+          text:
+            `# 🛡️ Anti-Bot & Member Verification\n\n` +
+            `Welcome to **${guild.name}**!\n\n` +
+            `To protect our aviation community from raid bots and automated spam accounts, please click the **Verify & Enter** button below.\n\n` +
+            `**What happens next?**\n` +
+            `• You will receive the **@✈️ㆍVerified** role.\n` +
+            `• All chat, photo sharing, voice lounges, and spotting channels will unlock immediately!\n\n` +
+            `*By verifying, you agree to treat other members with respect and follow server guidelines.*`,
+          accessory: componentsV2.createThumbnail('https://cdn-icons-png.flaticon.com/512/3125/3125713.png')
+        }),
+        componentsV2.createActionRow([
+          componentsV2.createButton({
+            customId: `verify_member_${verifiedRole.id}`,
+            label: 'Verify & Enter',
+            style: 3, // Success green
+            emoji: '✅'
+          })
+        ])
+      ]
+    });
 
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`verify_member_${verifiedRole.id}`)
-        .setLabel('Verify & Enter')
-        .setStyle(ButtonStyle.Success)
-        .setEmoji('✅')
-    );
-
-    await channel.send({ embeds: [embed], components: [row] });
-    console.log(`✅ Verification panel published in #${channel.name} (${guild.name})`);
+    await componentsV2.sendToChannel(guild.client, channel.id, [container]).catch(err => {
+      console.error('Failed to send Components V2 verify panel:', err);
+    });
+    console.log(`✅ Components V2 Verification panel published in #${channel.name} (${guild.name})`);
   }
 };

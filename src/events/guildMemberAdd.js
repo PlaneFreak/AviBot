@@ -22,6 +22,10 @@ module.exports = {
         console.log(`👋 Sent and deleted instant welcome ping for ${member.user.tag} in #${welcomeChannel.name}`);
       }
 
+      // Anti-Raid Security Monitor (Mass Join / Flood Defense)
+      const antiRaidService = require('../services/antiRaidService');
+      await antiRaidService.handleMemberJoin(member).catch(() => {});
+
       // Automatically assign 💎ㆍOG Member role if member is within the first 100
       const ogRoleService = require('../services/ogRoleService');
       await ogRoleService.checkAndAssignOGOnJoin(member).catch(() => {});

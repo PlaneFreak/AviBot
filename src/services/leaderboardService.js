@@ -107,6 +107,12 @@ module.exports = {
       .setTimestamp();
 
     if (!topPhotos || topPhotos.length === 0) {
+      if (!isManual) {
+        db.setLastLeaderboardRun(conf.key, guild.id, nowSeconds);
+        console.log(`ℹ️ [Leaderboard] ${conf.name} for ${guild.name} skipped (0 photo submissions in timeframe). Timestamp updated.`);
+        return null;
+      }
+
       embed.setDescription(`*No photo submissions were voted on in this timeframe.*`);
       return channel.send({ embeds: [embed] });
     }
@@ -115,55 +121,48 @@ module.exports = {
     const winner = topPhotos[0];
     const winnerAvg = winner.vote_count > 0 ? (winner.total_rating_sum / winner.vote_count).toFixed(1) : '0.0';
 
-    embed.setDescription(
-      `🥇 **1st Place Champion:** <@${winner.user_id}>\n` +
-      `🏆 **${winner.total_points} Points** • ⭐ **${winnerAvg}/10 Avg** • 🗳️ **${winner.vote_count} Votes**\n` +
-      (winner.caption ? `📝 *"${winner.caption}"*\n\n` : '\n') +
-      `**Top Spotters of the Period:**`
-    );
-
-    // Set Winner Photo Image
-    embed.setImage(winner.image_url);
-
-    // List Placements 2 to 10
+    // List Placements 1 to 10
     let rankList = '';
     const medals = ['🥇', '🥈', '🥉'];
 
     for (let i = 0; i < topPhotos.length; i++) {
       const p = topPhotos[i];
       const medal = i < 3 ? medals[i] : `\`#${i + 1}\``;
+      const userTag = `<@${p.user_id}>`;
       const avg = p.vote_count > 0 ? (p.total_rating_sum / p.vote_count).toFixed(1) : '0.0';
-      rankList += `${medal} <@${p.user_id}> — **${p.total_points} pts** (⭐ ${avg}/10 • 🗳️ ${p.vote_count})\n`;
+
+      rankList += `${medal} ${userTag} — **${p.total_points} pts** (*${avg}/10* • ${p.vote_count} votes)\n`;
     }
 
-    embed.addFields({
-      name: '📊 Full Rankings',
-      value: rankList || 'No other submissions'
+    const componentsV2 = require('../utils/componentsV2');
+    const container = componentsV2.createContainer({
+      accentColor: conf.color || 0xF1C40F,
+      components: [
+        componentsV2.createMediaGallery([winner.image_url]),
+        componentsV2.createSection({
+          text:
+            `# ${conf.icon} ${conf.name}\n\n` +
+            `🥇 **1st Place Champion:** <@${winner.user_id}>\n` +
+            `🏆 **${winner.total_points} Points** • ⭐ **${winnerAvg}/10 Avg** • 🗳️ **${winner.vote_count} Votes**\n` +
+            (winner.caption ? `📝 *"${winner.caption}"*\n\n` : '\n') +
+            `### 🎖️ Leaderboard Rankings\n${rankList.trim()}`
+        })
+      ]
     });
 
+    const msg = await componentsV2.sendToChannel(guild.client, channel.id, [container]);
+    db.setLastLeaderboardRun(conf.key, guild.id, nowSeconds);
+
     // Award XP to Winners
-    const xpNotes = [];
     if (conf.xpRewards) {
       for (let i = 0; i < Math.min(topPhotos.length, conf.xpRewards.length); i++) {
         const xpAmount = conf.xpRewards[i];
         if (xpAmount > 0) {
           const photo = topPhotos[i];
-          const xpResult = db.addXP(photo.user_id, guild.id, xpAmount);
-          const medal = medals[i];
-          const levelUpText = xpResult.leveledUp ? ` 🌟 *(Leveled Up to **Level ${xpResult.newLevel}**!)*` : '';
-          xpNotes.push(`${medal} <@${photo.user_id}>: **+${xpAmount} XP**${levelUpText}`);
+          db.addXP(photo.user_id, guild.id, xpAmount);
         }
       }
     }
-
-    if (xpNotes.length > 0) {
-      embed.addFields({
-        name: '✨ XP Rewards Awarded',
-        value: xpNotes.join('\n')
-      });
-    }
-
-    const msg = await channel.send({ embeds: [embed] });
 
     if (!isManual) {
       db.setLastLeaderboardRun(conf.key, guild.id, nowSeconds);

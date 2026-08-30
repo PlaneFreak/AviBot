@@ -80,18 +80,21 @@ module.exports = {
             displayAvatarURL: () => null
           }));
 
-          const currentEmbed = interaction.message.embeds[0];
-          const existingAttachment = interaction.message.attachments.first();
-          const displayImage = existingAttachment ? `attachment://${existingAttachment.name}` : (currentEmbed?.image?.url || submission.image_url);
-
-          const updatedEmbed = photoRatingHelper.createPhotoEmbed(
+          const updatedContainer = photoRatingHelper.createPhotoContainer(
             author,
-            displayImage,
+            submission.image_url,
             submission.caption,
-            voteResult
+            voteResult,
+            false
           );
 
-          await interaction.message.edit({ embeds: [updatedEmbed] });
+          const { Routes } = require('discord.js');
+          await client.rest.patch(Routes.channelMessage(interaction.channelId, interaction.message.id), {
+            body: {
+              flags: 32768,
+              components: [updatedContainer]
+            }
+          }).catch(() => {});
 
           const pointsText = rating === 10
             ? '🌟 **10/10 (+10 pts including +2 bonus!)**'
@@ -99,7 +102,7 @@ module.exports = {
 
           return interaction.reply({
             content: `✅ Your vote was recorded: ${pointsText}`,
-            ephemeral: true
+            flags: 64
           });
         } catch (err) {
           console.error('Error recording photo vote:', err);
@@ -108,6 +111,14 @@ module.exports = {
             ephemeral: true
           });
         }
+      }
+
+      // 2.05 Event Participation Button
+      if (customId === 'event_join_toggle') {
+        return interaction.reply({
+          content: `🎉 Awesome ${interaction.user}! You are marked as participating in this event. Good luck and have fun!`,
+          flags: 64
+        });
       }
 
       // 2.1 User clicks "Submit Appeal" in DM or Jail Channel
