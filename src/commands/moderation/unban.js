@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const config = require('../../config');
 
 module.exports = {
@@ -49,20 +50,22 @@ module.exports = {
 
       const user = banEntry.user;
 
-      const unbanEmbed = new EmbedBuilder()
-        .setColor(config.colors.success)
-        .setTitle(`${config.emojis.shield} User Unbanned`)
-        .setThumbnail(user.displayAvatarURL({ dynamic: true }))
-        .addFields(
-          { name: 'User', value: `${user.tag} (\`${user.id}\`)`, inline: true },
-          { name: 'Moderator', value: `${interaction.user.tag}`, inline: true },
-          { name: 'Reason', value: reason },
-          { name: 'Previous Ban Reason', value: banEntry.reason || 'None specified' }
-        )
-        .setFooter({ text: config.footerText })
-        .setTimestamp();
+      const unbanContainer = componentsV2.createContainer({
+        accentColor: config.colors.success,
+        components: [
+          componentsV2.createSection({
+            text: `# ${config.emojis.shield} User Unbanned\n\n` +
+                  `**User**\n${user.tag} (\`${user.id}\`)\n\n` +
+                  `**Moderator**\n${interaction.user.tag}\n\n` +
+                  `**Reason**\n${reason}\n\n` +
+                  `**Previous Ban Reason**\n${banEntry.reason || 'None specified'}\n\n` +
+                  `*${config.footerText}*`,
+            accessory: componentsV2.createThumbnail(user.displayAvatarURL({ dynamic: true }))
+          })
+        ]
+      });
 
-      await interaction.editReply({ embeds: [unbanEmbed] });
+      await componentsV2.editInteractionReply(interaction, [unbanContainer]);
     } catch (error) {
       console.error('Error during unban:', error);
       return interaction.editReply({

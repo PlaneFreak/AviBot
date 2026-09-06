@@ -1,4 +1,4 @@
-const { ChannelType, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { ChannelType, PermissionFlagsBits } = require('discord.js');
 const config = require('../config');
 
 const ADMIN_LOG_CHANNEL_NAME = '🛡️ㆍadmin-logs';

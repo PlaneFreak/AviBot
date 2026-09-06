@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const stickyManager = require('../../data/stickyManager');
 const config = require('../../config');
 
@@ -43,12 +44,14 @@ module.exports = {
       authorId: interaction.user.id
     });
 
-    const successEmbed = new EmbedBuilder()
-      .setColor(config.colors.success)
-      .setTitle('📌 Sticky Message Configured')
-      .setDescription(`Successfully set sticky message in ${channel}!\nWhenever members post, this message will stay stuck at the bottom.`)
-      .setFooter({ text: config.footerText });
+    const mdText = `# 📌 Sticky Message Configured\n\nSuccessfully set sticky message in ${channel}!\nWhenever members post, this message will stay stuck at the bottom.\n\n*${config.footerText}*`;
+    const container = componentsV2.createContainer({
+      accentColor: config.colors.success,
+      components: [
+        componentsV2.createSection({ text: mdText })
+      ]
+    });
 
-    await interaction.editReply({ embeds: [successEmbed] });
+    await componentsV2.editInteractionReply(interaction, [container]);
   }
 };

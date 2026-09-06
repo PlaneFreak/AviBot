@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const config = require('../../config');
 
 module.exports = {
@@ -15,16 +16,14 @@ module.exports = {
     const roundtripLatency = sent.createdTimestamp - interaction.createdTimestamp;
     const wsPing = client.ws.ping;
 
-    const embed = new EmbedBuilder()
-      .setColor(config.colors.primary)
-      .setTitle('🏓 Pong!')
-      .addFields(
-        { name: '📡 Bot Latency', value: `\`${roundtripLatency}ms\``, inline: true },
-        { name: '💓 API Latency', value: `\`${wsPing}ms\``, inline: true }
-      )
-      .setFooter({ text: config.footerText })
-      .setTimestamp();
+    const md = `# 🏓 Pong!\n\n**📡 Bot Latency**\n\`${roundtripLatency}ms\`\n\n**💓 API Latency**\n\`${wsPing}ms\`\n\n*${config.footerText}* <t:${Math.floor(Date.now() / 1000)}:R>`;
+    const container = componentsV2.createContainer({
+      accentColor: config.colors.primary,
+      components: [
+        componentsV2.createSection({ text: md })
+      ]
+    });
 
-    await interaction.editReply({ content: null, embeds: [embed] });
+    await componentsV2.editInteractionReply(interaction, [container], { content: null });
   }
 };

@@ -11,20 +11,24 @@ module.exports = {
         const guilds = client.guilds.cache.values();
 
         for (const guild of guilds) {
-          for (const [periodType, conf] of Object.entries(leaderboardService.PERIOD_CONFIG)) {
-            const lastRun = db.getLastLeaderboardRun(conf.key, guild.id);
+          try {
+            for (const [periodType, conf] of Object.entries(leaderboardService.PERIOD_CONFIG)) {
+              const lastRun = db.getLastLeaderboardRun(conf.key, guild.id);
 
-            // If never run, initialize last run to now so it doesn't spam all 5 at startup immediately
-            if (!lastRun) {
-              db.setLastLeaderboardRun(conf.key, guild.id, nowSeconds);
-              continue;
-            }
+              // If never run, initialize last run to now so it doesn't spam all 5 at startup immediately
+              if (!lastRun) {
+                db.setLastLeaderboardRun(conf.key, guild.id, nowSeconds);
+                continue;
+              }
 
-            // Check if period elapsed
-            if (nowSeconds - lastRun >= conf.durationSeconds) {
-              console.log(`📊 Generating ${conf.name} for guild ${guild.name} (${guild.id})...`);
-              await leaderboardService.postLeaderboard(guild, periodType, false);
+              // Check if period elapsed
+              if (nowSeconds - lastRun >= conf.durationSeconds) {
+                console.log(`📊 Generating ${conf.name} for guild ${guild.name} (${guild.id})...`);
+                await leaderboardService.postLeaderboard(guild, periodType, false);
+              }
             }
+          } catch (guildErr) {
+            console.error(`Error processing leaderboard for guild ${guild.id}:`, guildErr);
           }
         }
       } catch (err) {

@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const config = require('../../config');
 const suspensionManager = require('../../utils/suspensionManager');
 
@@ -76,46 +77,43 @@ module.exports = {
           interaction.user
         );
 
-        const suspendEmbed = new EmbedBuilder()
-          .setColor(config.colors.error)
-          .setTitle(`${config.emojis.shield} Member Quarantined (Ban Pending • Case #${caseNumber})`)
-          .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-          .setDescription(
-            `**${targetUser.tag}** has been moved to their private jail channel ${jailChannel} and assigned \`⛔ㆍSuspended\`.\n` +
-            `They have **5 days** (<t:${expiresAtSeconds}:R>) to submit an appeal before the ban is finalized.`
-          )
-          .addFields(
-            { name: 'User', value: `${targetUser.tag} (\`${targetUser.id}\`)`, inline: true },
-            { name: 'Moderator', value: `${interaction.user.tag}`, inline: true },
-            { name: 'Jail Channel', value: `${jailChannel}`, inline: true },
-            { name: 'Reason', value: reason }
-          )
-          .setFooter({ text: `${config.footerText} • Case #${caseNumber}` })
-          .setTimestamp();
+        const container = componentsV2.createContainer({
+          accentColor: config.colors.error,
+          components: [
+            componentsV2.createSection({
+              text: `# ${config.emojis.shield} Member Quarantined (Ban Pending • Case #${caseNumber})\n\n**${targetUser.tag}** has been moved to their private jail channel ${jailChannel} and assigned \`⛔ㆍSuspended\`.\nThey have **5 days** (<t:${expiresAtSeconds}:R>) to submit an appeal before the ban is finalized.\n\n**User**\n${targetUser.tag} (\`${targetUser.id}\`)\n\n**Moderator**\n${interaction.user.tag}\n\n**Jail Channel**\n${jailChannel}\n\n**Reason**\n${reason}\n\n*${config.footerText} • Case #${caseNumber}*`,
+              accessory: componentsV2.createThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
+            })
+          ]
+        });
 
-        return interaction.editReply({ embeds: [suspendEmbed] });
+        return componentsV2.editInteractionReply(interaction, [container]);
       }
     }
 
     // Immediate Ban Execution
-    await interaction.guild.members.ban(targetUser.id, {
-      deleteMessageSeconds: deleteDays * 86400,
-      reason: `${interaction.user.tag}: ${reason}`
+    try {
+      await interaction.guild.members.ban(targetUser.id, {
+        deleteMessageSeconds: deleteDays * 86400,
+        reason: `${interaction.user.tag}: ${reason}`
+      });
+    } catch (err) {
+      return interaction.reply({
+        content: `❌ Failed to ban user: ${err.message}`,
+        ephemeral: true
+      });
+    }
+
+    const banContainer = componentsV2.createContainer({
+      accentColor: config.colors.error,
+      components: [
+        componentsV2.createSection({
+          text: `# ${config.emojis.shield} Member Banned (Immediate)\n\n**User**\n${targetUser.tag} (\`${targetUser.id}\`)\n\n**Moderator**\n${interaction.user.tag}\n\n**Reason**\n${reason}\n\n**Deleted Messages**\n${deleteDays} day(s)\n\n*${config.footerText}*`,
+          accessory: componentsV2.createThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
+        })
+      ]
     });
 
-    const banEmbed = new EmbedBuilder()
-      .setColor(config.colors.error)
-      .setTitle(`${config.emojis.shield} Member Banned (Immediate)`)
-      .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-      .addFields(
-        { name: 'User', value: `${targetUser.tag} (\`${targetUser.id}\`)`, inline: true },
-        { name: 'Moderator', value: `${interaction.user.tag}`, inline: true },
-        { name: 'Reason', value: reason },
-        { name: 'Deleted Messages', value: `${deleteDays} day(s)`, inline: true }
-      )
-      .setFooter({ text: config.footerText })
-      .setTimestamp();
-
-    await interaction.reply({ embeds: [banEmbed] });
+    await componentsV2.replyToInteraction(interaction, [banContainer]);
   }
 };

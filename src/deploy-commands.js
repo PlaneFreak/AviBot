@@ -5,7 +5,7 @@ require('dotenv').config();
 
 const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.CLIENT_ID;
-const guildId = process.env.GUILD_ID || '1524791551820173622';
+const guildId = process.env.GUILD_ID;
 
 if (!token || !clientId) {
   console.error('❌ Error: Missing DISCORD_TOKEN or CLIENT_ID in .env file!');

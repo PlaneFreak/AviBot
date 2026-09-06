@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const stickyManager = require('../../data/stickyManager');
 const config = require('../../config');
 
@@ -27,12 +28,14 @@ module.exports = {
 
     stickyManager.deleteSticky(channel.id);
 
-    const embed = new EmbedBuilder()
-      .setColor(config.colors.success)
-      .setTitle('🗑️ Sticky Message Removed')
-      .setDescription(`The sticky message for ${channel} has been successfully cleared.`)
-      .setFooter({ text: config.footerText });
+    const mdText = `# 🗑️ Sticky Message Removed\n\nThe sticky message for ${channel} has been successfully cleared.\n\n*${config.footerText}*`;
+    const container = componentsV2.createContainer({
+      accentColor: config.colors.success,
+      components: [
+        componentsV2.createSection({ text: mdText })
+      ]
+    });
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await componentsV2.replyToInteraction(interaction, [container], { ephemeral: true });
   }
 };

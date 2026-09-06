@@ -51,6 +51,7 @@ module.exports = {
             console.warn(`Could not add OG role to ${member.user.tag}:`, err.message);
           });
           addedCount++;
+          await new Promise(r => setTimeout(r, 500));
         }
       }
 

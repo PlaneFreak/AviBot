@@ -1,7 +1,6 @@
 const {
   SlashCommandBuilder,
   PermissionFlagsBits,
-  EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -9,6 +8,7 @@ const {
 } = require('discord.js');
 const config = require('../../config');
 const serverTemplate = require('../../templates/serverTemplate');
+const componentsV2 = require('../../utils/componentsV2');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -42,23 +42,6 @@ module.exports = {
     }
 
     if (!skipConfirmation) {
-      const confirmEmbed = new EmbedBuilder()
-        .setColor(config.colors.primary)
-        .setTitle('🛫 Aviation Server Setup Confirmation')
-        .setDescription(
-          'This command will configure the server with the complete **Aviation, Spotting & Flight Sim** architecture:\n\n' +
-          '**Architecture Overview:**\n' +
-          '• **Important**: `📰ㆍnews`, `📜ㆍrules`, `👋ㆍwelcome`, `🎨ㆍroles`\n' +
-          '• **General**: `💬ㆍchat`, `📷ㆍpic-rating`, `❓ㆍjetphotos`, `📸ㆍyour-photos`, `✈️ㆍaviation`, `🛫ㆍairport-discussion`, `💡ㆍquestions`, `🌍ㆍoff-topic`, `😂ㆍmemes`, `📸ㆍmedia`\n' +
-          '• **Spotting**: `📍ㆍspotting-locations`, `🗓️ㆍspotting-plans`, `📆ㆍevents`, `🌤️ㆍweather`, `🎯ㆍrare-catches`, `📈ㆍflight-tracking`\n' +
-          '• **Flight Sim**: `🛩️ㆍmsfs`, `✈️ㆍx-plane`, `🚁ㆍdcs`, `🎮ㆍother-sims`\n' +
-          '• **Voice Channels**: `General VC`, `Spotting VC`, `Flight Sim VC`, `AFK`\n' +
-          '• **Staff**: `📢ㆍstaff-news`, `💬ㆍstaff-chat`, `📳ㆍmoderators-chat`\n\n' +
-          '• **Automated Actions**: Sets permissions, topics, and publishes the official Aviation Rules embed.\n\n' +
-          'Would you like to start the setup?'
-        )
-        .setFooter({ text: config.footerText });
-
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId('confirm_setup')
@@ -72,10 +55,31 @@ module.exports = {
           .setEmoji('✖️')
       );
 
+      const confirmText = '# 🛫 Aviation Server Setup Confirmation\n\n' +
+        'This command will configure the server with the complete **Aviation, Spotting & Flight Sim** architecture:\n\n' +
+        '**Architecture Overview:**\n' +
+        '• **Important**: `📰ㆍnews`, `📸ㆍinstagram`, `📜ㆍrules`, `👋ㆍwelcome`, `🎨ㆍroles`\n' +
+        '• **General**: `💬ㆍchat`, `📷ㆍpic-rating`, `❓ㆍjetphotos`, `📸ㆍyour-photos`, `✈️ㆍaviation`, `🛫ㆍairport-discussion`, `💡ㆍquestions`, `🌍ㆍoff-topic`, `😂ㆍmemes`, `📸ㆍmedia`\n' +
+        '• **Spotting**: `📍ㆍspotting-locations`, `🗓️ㆍspotting-plans`, `📆ㆍevents`, `🌤️ㆍweather`, `🎯ㆍrare-catches`, `📈ㆍflight-tracking`\n' +
+        '• **Flight Sim**: `🛩️ㆍmsfs`, `✈️ㆍx-plane`, `🚁ㆍdcs`, `🎮ㆍother-sims`\n' +
+        '• **Voice Channels**: `General VC`, `Spotting VC`, `Flight Sim VC`, `AFK`\n' +
+        '• **Staff**: `📢ㆍstaff-news`, `💬ㆍstaff-chat`, `📳ㆍmoderators-chat`\n\n' +
+        '• **Automated Actions**: Sets permissions, topics, and publishes the official Aviation Rules embed.\n\n' +
+        'Would you like to start the setup?\n\n' +
+        `*${config.footerText}*`;
+
+      const confirmContainer = componentsV2.createContainer({
+        accentColor: config.colors.primary,
+        components: [
+          componentsV2.createSection({ text: confirmText }),
+          componentsV2.createActionRow(row.components.map(b => b.toJSON ? b.toJSON() : b.data || b))
+        ]
+      });
+
       const response = await interaction.reply({
-        embeds: [confirmEmbed],
-        components: [row],
-        ephemeral: true
+        components: [confirmContainer],
+        flags: 32768 | 64, // V2 + Ephemeral
+        fetchReply: true
       });
 
       const filter = i => i.user.id === interaction.user.id;
@@ -234,59 +238,66 @@ module.exports = {
       // 4. Post Server Rules
       if (rulesChannelRef) {
         const rulesData = serverTemplate.rulesContent;
-        const rulesEmbed = new EmbedBuilder()
-          .setColor(config.colors.primary)
-          .setTitle(rulesData.title)
-          .setDescription(rulesData.description)
-          .addFields(rulesData.fields)
-          .setFooter({ text: `${rulesData.footer} • ${config.footerText}` })
-          .setTimestamp();
+        let rulesText = `# ${rulesData.title}\n\n`;
+        if (rulesData.description) rulesText += `${rulesData.description}\n\n`;
+        if (rulesData.fields) {
+          rulesText += rulesData.fields.map(f => `**${f.name}**\n${f.value}`).join('\n\n') + '\n\n';
+        }
+        rulesText += `*${rulesData.footer} • ${config.footerText}*`;
 
-        await rulesChannelRef.send({ embeds: [rulesEmbed] }).catch(() => {});
+        const rulesContainer = componentsV2.createContainer({
+          accentColor: config.colors.primary,
+          components: [ componentsV2.createSection({ text: rulesText }) ]
+        });
+
+        await componentsV2.sendToChannel(interaction.client, rulesChannelRef.id, [rulesContainer]).catch(() => {});
       }
 
       // 5. Post Welcome Message if clean
       if (welcomeChannelRef) {
-        const welcomeEmbed = new EmbedBuilder()
-          .setColor(config.colors.info)
-          .setTitle('🛫 Welcome to the Aviation & Spotting Community!')
-          .setDescription(
-            'Welcome aboard! We are thrilled to have you here.\n\n' +
-            '**Quick Start Checklist:**\n' +
-            `• Check out ${rulesChannelRef || 'our rules'} before posting.\n` +
-            `• Grab your roles in ${rolesChannelRef || '#roles'}.\n` +
-            '• Introduce yourself and share your favorite aircraft or spotting gear in `#💬ㆍchat` or `#📸ㆍyour-photos`!\n\n' +
-            '*Clear skies and happy spotting!*'
-          )
-          .setFooter({ text: config.footerText })
-          .setTimestamp();
+        const welcomeText = '# 🛫 Welcome to the Aviation & Spotting Community!\n\n' +
+          'Welcome aboard! We are thrilled to have you here.\n\n' +
+          '**Quick Start Checklist:**\n' +
+          `• Check out ${rulesChannelRef || 'our rules'} before posting.\n` +
+          `• Grab your roles in ${rolesChannelRef || '#roles'}.\n` +
+          '• Introduce yourself and share your favorite aircraft or spotting gear in `#💬ㆍchat` or `#📸ㆍyour-photos`!\n\n' +
+          '*Clear skies and happy spotting!*\n\n' +
+          `*${config.footerText}*`;
 
-        await welcomeChannelRef.send({ embeds: [welcomeEmbed] }).catch(() => {});
+        const welcomeContainer = componentsV2.createContainer({
+          accentColor: config.colors.info,
+          components: [ componentsV2.createSection({ text: welcomeText }) ]
+        });
+
+        await componentsV2.sendToChannel(interaction.client, welcomeChannelRef.id, [welcomeContainer]).catch(() => {});
       }
 
-      const summaryEmbed = new EmbedBuilder()
-        .setColor(config.colors.success)
-        .setTitle(`${config.emojis.success} Aviation Server Setup Finished!`)
-        .setDescription(`Server layout and custom rules have been successfully applied to **${guild.name}**!`)
-        .addFields(
-          { name: '📁 Categories', value: `\`${createdCategoriesCount}\` created`, inline: true },
-          { name: '# Channels', value: `\`${createdChannelsCount}\` created, \`${configuredChannelsCount}\` configured`, inline: true },
-          { name: '📜 Rules Channel', value: rulesChannelRef ? `${rulesChannelRef}` : 'Configured', inline: true },
-          { name: '👋 Welcome Channel', value: welcomeChannelRef ? `${welcomeChannelRef}` : 'Configured', inline: true }
-        )
-        .setFooter({ text: config.footerText })
-        .setTimestamp();
+      const summaryText = `# ${config.emojis.success} Aviation Server Setup Finished!\n\n` +
+        `Server layout and custom rules have been successfully applied to **${guild.name}**!\n\n` +
+        `**📁 Categories**\n\`${createdCategoriesCount}\` created\n\n` +
+        `**# Channels**\n\`${createdChannelsCount}\` created, \`${configuredChannelsCount}\` configured\n\n` +
+        `**📜 Rules Channel**\n${rulesChannelRef ? `${rulesChannelRef}` : 'Configured'}\n\n` +
+        `**👋 Welcome Channel**\n${welcomeChannelRef ? `${welcomeChannelRef}` : 'Configured'}\n\n` +
+        `*${config.footerText}*`;
 
-      await interaction.editReply({ content: null, embeds: [summaryEmbed] });
+      const summaryContainer = componentsV2.createContainer({
+        accentColor: config.colors.success,
+        components: [ componentsV2.createSection({ text: summaryText }) ]
+      });
+
+      await componentsV2.editInteractionReply(interaction, [summaryContainer]);
     } catch (error) {
       console.error('Error during setup execution:', error);
-      const errEmbed = new EmbedBuilder()
-        .setColor(config.colors.error)
-        .setTitle(`${config.emojis.error} Setup Failed`)
-        .setDescription(`An error occurred while setting up the server:\n\`\`\`${error.message}\`\`\``)
-        .setFooter({ text: config.footerText });
+      const errText = `# ${config.emojis.error} Setup Failed\n\n` +
+        `An error occurred while setting up the server:\n\`\`\`${error.message}\`\`\`\n\n` +
+        `*${config.footerText}*`;
 
-      await interaction.editReply({ content: null, embeds: [errEmbed] });
+      const errContainer = componentsV2.createContainer({
+        accentColor: config.colors.error,
+        components: [ componentsV2.createSection({ text: errText }) ]
+      });
+
+      await componentsV2.editInteractionReply(interaction, [errContainer]);
     }
   }
 };

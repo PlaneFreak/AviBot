@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const config = require('../../config');
 
 module.exports = {
@@ -28,37 +29,45 @@ module.exports = {
 
     await interaction.deferReply({ ephemeral: true });
 
-    const channel = interaction.channel;
-    const messages = await channel.messages.fetch({ limit: amount });
+    try {
+      const channel = interaction.channel;
+      const messages = await channel.messages.fetch({ limit: amount });
 
-    let messagesToDelete = messages;
-    if (targetUser) {
-      messagesToDelete = messages.filter(m => m.author.id === targetUser.id);
-    }
+      let messagesToDelete = messages;
+      if (targetUser) {
+        messagesToDelete = messages.filter(m => m.author.id === targetUser.id);
+      }
 
-    // Filter out messages older than 14 days (Discord limitation)
-    const fourteenDaysAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
-    const recentMessages = messagesToDelete.filter(m => m.createdTimestamp > fourteenDaysAgo);
+      // Filter out messages older than 14 days (Discord limitation)
+      const fourteenDaysAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
+      const recentMessages = messagesToDelete.filter(m => m.createdTimestamp > fourteenDaysAgo);
 
-    if (recentMessages.size === 0) {
+      if (recentMessages.size === 0) {
+        return interaction.editReply({
+          content: `${config.emojis.warning} No deletable messages found (messages older than 14 days cannot be bulk deleted).`
+        });
+      }
+
+      const deleted = await channel.bulkDelete(recentMessages, true);
+
+      const desc = targetUser
+        ? `Successfully purged **${deleted.size}** message(s) from **${targetUser.tag}** in ${channel}.`
+        : `Successfully purged **${deleted.size}** message(s) in ${channel}.`;
+
+      const container = componentsV2.createContainer({
+        accentColor: config.colors.success,
+        components: [
+          componentsV2.createSection({
+            text: `# ${config.emojis.success} Messages Deleted\n\n${desc}\n\n*${config.footerText}*`
+          })
+        ]
+      });
+
+      await componentsV2.editInteractionReply(interaction, [container]);
+    } catch (err) {
       return interaction.editReply({
-        content: `${config.emojis.warning} No deletable messages found (messages older than 14 days cannot be bulk deleted).`
+        content: `❌ Failed to clear messages: ${err.message}`
       });
     }
-
-    const deleted = await channel.bulkDelete(recentMessages, true);
-
-    const embed = new EmbedBuilder()
-      .setColor(config.colors.success)
-      .setTitle(`${config.emojis.success} Messages Deleted`)
-      .setDescription(
-        targetUser
-          ? `Successfully purged **${deleted.size}** message(s) from **${targetUser.tag}** in ${channel}.`
-          : `Successfully purged **${deleted.size}** message(s) in ${channel}.`
-      )
-      .setFooter({ text: config.footerText })
-      .setTimestamp();
-
-    await interaction.editReply({ embeds: [embed] });
   }
 };

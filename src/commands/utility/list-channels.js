@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, AttachmentBuilder, ChannelType } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, AttachmentBuilder, ChannelType } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const config = require('../../config');
 
 module.exports = {
@@ -71,24 +72,28 @@ module.exports = {
       const buffer = Buffer.from(fullTextOutput, 'utf-8');
       const attachment = new AttachmentBuilder(buffer, { name: `${guild.name.replace(/[^a-zA-Z0-9]/g, '_')}_channels.txt` });
 
-      const fileEmbed = new EmbedBuilder()
-        .setColor(config.colors.primary)
-        .setTitle(`${config.emojis.channel} Server Channel List`)
-        .setDescription(`Found **${channels.size}** total channels in **${guild.name}**.\nThe full list has been attached as a text file for easy reading.`)
-        .setFooter({ text: config.footerText })
-        .setTimestamp();
+      const mdText = `# ${config.emojis.channel} Server Channel List\n\nFound **${channels.size}** total channels in **${guild.name}**.\nThe full list has been attached as a text file for easy reading.\n\n*${config.footerText}* <t:${Math.floor(Date.now() / 1000)}:R>`;
+      
+      const fileContainer = componentsV2.createContainer({
+        accentColor: config.colors.primary,
+        components: [
+          componentsV2.createSection({ text: mdText })
+        ]
+      });
 
-      return interaction.editReply({ embeds: [fileEmbed], files: [attachment] });
+      return interaction.editReply({ components: [fileContainer], flags: 32768, files: [attachment] });
     }
 
     // Embed formatting if it fits
-    const embed = new EmbedBuilder()
-      .setColor(config.colors.primary)
-      .setTitle(`${config.emojis.channel} Server Channel List (${channels.size} Channels)`)
-      .setDescription(`\`\`\`text\n${displayOutput.slice(0, 3900)}\`\`\``)
-      .setFooter({ text: config.footerText })
-      .setTimestamp();
+    const mdText = `# ${config.emojis.channel} Server Channel List (${channels.size} Channels)\n\n\`\`\`text\n${displayOutput.slice(0, 3900)}\`\`\`\n\n*${config.footerText}* <t:${Math.floor(Date.now() / 1000)}:R>`;
+    
+    const container = componentsV2.createContainer({
+      accentColor: config.colors.primary,
+      components: [
+        componentsV2.createSection({ text: mdText })
+      ]
+    });
 
-    await interaction.editReply({ embeds: [embed] });
+    await componentsV2.editInteractionReply(interaction, [container]);
   }
 };

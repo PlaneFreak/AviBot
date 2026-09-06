@@ -1,7 +1,6 @@
 const {
   ChannelType,
   PermissionFlagsBits,
-  EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle
@@ -9,6 +8,7 @@ const {
 const db = require('../database/db');
 const config = require('../config');
 const appealHelper = require('./appealHelper');
+const componentsV2 = require('./componentsV2');
 
 const SUSPENDED_ROLE_NAME = '⛔ㆍSuspended';
 const QUARANTINE_CATEGORY_NAME = '⛓️ ┃ QUARANTINE';
@@ -177,44 +177,46 @@ module.exports = {
     const titleEmoji = isBan ? '🔨' : '👢';
     const actionName = isBan ? 'Permanent Ban' : 'Server Kick';
 
-    // Embed for the dedicated Jail Channel & DM
-    const quarantineEmbed = new EmbedBuilder()
-      .setColor(config.colors.error)
-      .setTitle(`${titleEmoji} Account Suspended • ${actionName} Pending`)
-      .setDescription(
-        `Hello ${member}, your server access has been quarantined.\n\n` +
-        `This is your private appeal channel: **#${jailChannelName}**.\n` +
-        `You have **5 days** (<t:${expiresAtSeconds}:R>) to submit an appeal before your ${actionName.toLowerCase()} is finalized.`
-      )
-      .addFields(
-        { name: '⚠️ Punishment', value: `\`${type.toUpperCase()}\``, inline: true },
-        { name: '🛡️ Moderator', value: moderator.tag, inline: true },
-        { name: '📁 Case Number', value: `\`#${formattedCase}\``, inline: true },
-        { name: '⏳ Expiration / Deadline', value: `<t:${expiresAtSeconds}:F> (<t:${expiresAtSeconds}:R>)`, inline: false },
-        { name: '📝 Reason', value: reason || 'No reason provided', inline: false },
-        {
-          name: '📌 How to Appeal',
-          value: '• Click **Submit Appeal** to fill out your appeal form.\n• Moderation staff can enable two-way live chat using the **Chat Activate** button if required.'
-        }
-      )
-      .setFooter({ text: `${config.footerText} • 5-Day Appeal Window • Case #${formattedCase}` })
-      .setTimestamp();
-
     const jailActionRow = appealHelper.createJailActionRow(guild.id, type, member.id);
+    const rawJailButtons = jailActionRow.components.map(b => b.toJSON ? b.toJSON() : b.data || b);
+    
     const dmAppealRow = appealHelper.createAppealButton(guild.id, type);
+    const rawDmButtons = dmAppealRow.components.map(b => b.toJSON ? b.toJSON() : b.data || b);
 
-    // Post in dedicated Jail Channel
-    const hubMsg = await jailChannel.send({
-      content: `${member}`,
-      embeds: [quarantineEmbed],
-      components: [jailActionRow]
+    const sectionText = `# ${titleEmoji} Account Suspended • ${actionName} Pending\n\n` +
+      `Hello ${member}, your server access has been quarantined.\n\n` +
+      `This is your private appeal channel: **#${jailChannelName}**.\n` +
+      `You have **5 days** (<t:${expiresAtSeconds}:R>) to submit an appeal before your ${actionName.toLowerCase()} is finalized.\n\n` +
+      `**⚠️ Punishment**\n\`${type.toUpperCase()}\`\n\n` +
+      `**🛡️ Moderator**\n${moderator.tag}\n\n` +
+      `**📁 Case Number**\n\`#${formattedCase}\`\n\n` +
+      `**⏳ Expiration / Deadline**\n<t:${expiresAtSeconds}:F> (<t:${expiresAtSeconds}:R>)\n\n` +
+      `**📝 Reason**\n${reason || 'No reason provided'}\n\n` +
+      `**📌 How to Appeal**\n• Click **Submit Appeal** to fill out your appeal form.\n• Moderation staff can enable two-way live chat using the **Chat Activate** button if required.\n\n` +
+      `*${config.footerText} • 5-Day Appeal Window • Case #${formattedCase}*`;
+
+    const jailContainer = componentsV2.createContainer({
+      accentColor: config.colors.error,
+      components: [
+        componentsV2.createSection({ text: sectionText }),
+        componentsV2.createActionRow(rawJailButtons)
+      ]
     });
 
+    const dmContainer = componentsV2.createContainer({
+      accentColor: config.colors.error,
+      components: [
+        componentsV2.createSection({ text: sectionText }),
+        componentsV2.createActionRow(rawDmButtons)
+      ]
+    });
+
+    // Post in dedicated Jail Channel
+    await jailChannel.send({ content: `${member}` });
+    const hubMsg = await componentsV2.sendToChannel(guild.client, jailChannel.id, [jailContainer]);
+
     // Try sending DM
-    await member.send({
-      embeds: [quarantineEmbed],
-      components: [dmAppealRow]
-    }).catch(() => {});
+    await componentsV2.sendDM(guild.client, member.id, [dmContainer]).catch(() => {});
 
     // Save in SQLite DB
     await db.createPunishment({

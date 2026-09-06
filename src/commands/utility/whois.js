@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const config = require('../../config');
 
 function getKeyPermissions(member) {
@@ -36,37 +37,22 @@ module.exports = {
 
     const userCreatedTimestamp = Math.floor(targetUser.createdTimestamp / 1000);
     const isBot = targetUser.bot ? '🤖 Yes (Bot)' : '👤 No (Human)';
-
-    const embed = new EmbedBuilder()
-      .setColor(member ? member.displayColor || config.colors.primary : config.colors.primary)
-      .setTitle(`👤 User Information • ${targetUser.tag}`)
-      .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 512 }))
-      .addFields(
-        {
-          name: '🆔 Identity',
-          value: [
-            `• **Mention:** ${targetUser}`,
-            `• **User ID:** \`${targetUser.id}\``,
-            `• **Account Type:** ${isBot}`,
-            `• **Nickname:** ${member && member.nickname ? `\`${member.nickname}\`` : 'None'}`
-          ].join('\n'),
-          inline: false
-        },
-        {
-          name: '📅 Dates & Timelines',
-          value: [
-            `• **Account Created:** <t:${userCreatedTimestamp}:F> (<t:${userCreatedTimestamp}:R>)`,
-            `• **Joined Server:** ${
-              member && member.joinedTimestamp
-                ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:F> (<t:${Math.floor(member.joinedTimestamp / 1000)}:R>)`
-                : 'Not in this server'
-            }`
-          ].join('\n'),
-          inline: false
-        }
-      )
-      .setFooter({ text: config.footerText })
-      .setTimestamp();
+    
+    let mdText = `# 👤 User Information • ${targetUser.tag}\n\n`;
+    
+    mdText += `**🆔 Identity**\n`;
+    mdText += `• **Mention:** ${targetUser}\n`;
+    mdText += `• **User ID:** \`${targetUser.id}\`\n`;
+    mdText += `• **Account Type:** ${isBot}\n`;
+    mdText += `• **Nickname:** ${member && member.nickname ? `\`${member.nickname}\`` : 'None'}\n\n`;
+    
+    mdText += `**📅 Dates & Timelines**\n`;
+    mdText += `• **Account Created:** <t:${userCreatedTimestamp}:F> (<t:${userCreatedTimestamp}:R>)\n`;
+    mdText += `• **Joined Server:** ${
+      member && member.joinedTimestamp
+        ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:F> (<t:${Math.floor(member.joinedTimestamp / 1000)}:R>)`
+        : 'Not in this server'
+    }\n\n`;
 
     if (member) {
       // Roles
@@ -84,24 +70,25 @@ module.exports = {
         ? `⚠️ Yes (Until <t:${Math.floor(member.communicationDisabledUntilTimestamp / 1000)}:R>)`
         : '✅ No';
 
-      embed.addFields(
-        {
-          name: `🎭 Roles [${roles.length}]`,
-          value: rolesDisplay,
-          inline: false
-        },
-        {
-          name: '🛡️ Key Permissions & Status',
-          value: [
-            `• **Highest Role:** ${member.roles.highest}`,
-            `• **Timed Out:** ${isTimedOut}`,
-            `• **Permissions:** ${getKeyPermissions(member).join(', ')}`
-          ].join('\n'),
-          inline: false
-        }
-      );
+      mdText += `**🎭 Roles [${roles.length}]**\n${rolesDisplay}\n\n`;
+      mdText += `**🛡️ Key Permissions & Status**\n`;
+      mdText += `• **Highest Role:** ${member.roles.highest}\n`;
+      mdText += `• **Timed Out:** ${isTimedOut}\n`;
+      mdText += `• **Permissions:** ${getKeyPermissions(member).join(', ')}\n\n`;
     }
+    
+    mdText += `*${config.footerText}* <t:${Math.floor(Date.now() / 1000)}:R>`;
 
-    await interaction.reply({ embeds: [embed] });
+    const container = componentsV2.createContainer({
+      accentColor: member ? member.displayColor || config.colors.primary : config.colors.primary,
+      components: [
+        componentsV2.createSection({
+          text: mdText,
+          accessory: componentsV2.createThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 512 }))
+        })
+      ]
+    });
+
+    await componentsV2.replyToInteraction(interaction, [container]);
   }
 };

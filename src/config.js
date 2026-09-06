@@ -20,7 +20,16 @@ module.exports = {
     channel: '📁',
     shield: '🛡️',
     rules: '📜',
-    settings: '⚙️'
+    settings: '⚙️',
+    instagram: '📸'
+  },
+  instagram: {
+    username: process.env.INSTAGRAM_USERNAME || '',
+    channelId: process.env.INSTAGRAM_CHANNEL_ID || '',
+    webhookPort: parseInt(process.env.INSTAGRAM_WEBHOOK_PORT || '3050', 10),
+    webhookSecret: process.env.INSTAGRAM_WEBHOOK_SECRET || '',
+    rssUrl: process.env.INSTAGRAM_RSS_URL || '',
+    pollIntervalMinutes: parseInt(process.env.INSTAGRAM_POLL_INTERVAL || '3', 10)
   },
   footerText: 'AviBot • Server Management & Moderation'
 };

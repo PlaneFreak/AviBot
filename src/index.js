@@ -5,6 +5,7 @@ const config = require('./config');
 const db = require('./database/db');
 const expirationWorker = require('./workers/expirationWorker');
 const leaderboardWorker = require('./workers/leaderboardWorker');
+const instagramWorker = require('./workers/instagramWorker');
 
 // Initialize Discord Client with necessary Gateway Intents
 const client = new Client({
@@ -32,6 +33,15 @@ process.on('uncaughtException', (err, origin) => {
   console.error(`Caught exception: ${err}\nException origin: ${origin}`);
 });
 
+// Graceful shutdown handler
+const shutdown = (signal) => {
+  console.log(`\n🛑 Received ${signal}. Shutting down gracefully...`);
+  db.closeDB();
+  process.exit(0);
+};
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+
 // Check if DISCORD_TOKEN is present
 if (!config.token) {
   console.error('❌ Error: No DISCORD_TOKEN found in .env file!');
@@ -41,7 +51,7 @@ if (!config.token) {
 
 // Start sequence
 (async () => {
-  // 1. Initialize PostgreSQL / Fallback Database
+  // 1. Initialize SQLite Database
   await db.initDB();
 
   // 2. Load Command and Event Handlers
@@ -54,7 +64,10 @@ if (!config.token) {
   // 4. Start Leaderboard Worker
   leaderboardWorker.start(client);
 
-  // 5. Log in to Discord
+  // 5. Start Instagram Feed & Webhook Worker
+  instagramWorker.start(client);
+
+  // 6. Log in to Discord
   client.login(config.token).catch((err) => {
     console.error('❌ Failed to login to Discord:', err.message);
     process.exit(1);

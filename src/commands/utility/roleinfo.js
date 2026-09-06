@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const config = require('../../config');
 
 // Key / Significant permissions mapped to human-readable labels
@@ -80,45 +81,39 @@ module.exports = {
       const remaining = memberCount - sample.length;
       memberListDisplay = sampleText + (remaining > 0 ? ` *...and ${remaining} more*` : '');
     }
+    
+    let mdText = `# 🏷️ Role Information • ${role.name}\n\n`;
+    
+    mdText += `**📋 General Details**\n`;
+    mdText += `• **Role Mention:** ${role}\n`;
+    mdText += `• **Role ID:** \`${role.id}\`\n`;
+    mdText += `• **Color:** \`${hexColor}\`\n`;
+    mdText += `• **Created:** <t:${createdSeconds}:F> (<t:${createdSeconds}:R>)\n`;
+    mdText += `• **Position:** \`#${role.position}\` / \`${guild.roles.cache.size}\` in hierarchy\n\n`;
+    
+    mdText += `**⚙️ Settings & Flags**\n`;
+    mdText += `• **Separated (Hoist):** ${role.hoist ? '✅ Yes' : '❌ No'}\n`;
+    mdText += `• **Mentionable:** ${role.mentionable ? '✅ Yes' : '❌ No'}\n`;
+    mdText += `• **Managed (Bot/Integration):** ${role.managed ? '🤖 Yes' : '❌ No'}\n`;
+    mdText += `• **Members:** \`${memberCount}\` (${memberPercentage}% of server)\n\n`;
+    
+    mdText += `**👥 Members (${memberCount})**\n${memberListDisplay}\n\n`;
+    
+    const safePermsDisplay = permsDisplay.length > 1024 ? permsDisplay.slice(0, 1020) + '...' : permsDisplay;
+    mdText += `**🛡️ Permissions (${permissions.length})**\n${safePermsDisplay}\n\n`;
+    
+    mdText += `*${config.footerText} • Role Inspector* <t:${Math.floor(Date.now() / 1000)}:R>`;
 
-    const embed = new EmbedBuilder()
-      .setColor(role.color || config.colors.primary)
-      .setTitle(`🏷️ Role Information • ${role.name}`)
-      .setThumbnail(role.iconURL({ size: 512 }) || null)
-      .addFields(
-        {
-          name: '📋 General Details',
-          value:
-            `• **Role Mention:** ${role}\n` +
-            `• **Role ID:** \`${role.id}\`\n` +
-            `• **Color:** \`${hexColor}\`\n` +
-            `• **Created:** <t:${createdSeconds}:F> (<t:${createdSeconds}:R>)\n` +
-            `• **Position:** \`#${role.position}\` / \`${guild.roles.cache.size}\` in hierarchy`,
-          inline: true
-        },
-        {
-          name: '⚙️ Settings & Flags',
-          value:
-            `• **Separated (Hoist):** ${role.hoist ? '✅ Yes' : '❌ No'}\n` +
-            `• **Mentionable:** ${role.mentionable ? '✅ Yes' : '❌ No'}\n` +
-            `• **Managed (Bot/Integration):** ${role.managed ? '🤖 Yes' : '❌ No'}\n` +
-            `• **Members:** \`${memberCount}\` (${memberPercentage}% of server)`,
-          inline: true
-        },
-        {
-          name: `👥 Members (${memberCount})`,
-          value: memberListDisplay,
-          inline: false
-        },
-        {
-          name: `🛡️ Permissions (${permissions.length})`,
-          value: permsDisplay.length > 1024 ? permsDisplay.slice(0, 1020) + '...' : permsDisplay,
-          inline: false
-        }
-      )
-      .setFooter({ text: `${config.footerText} • Role Inspector` })
-      .setTimestamp();
+    const container = componentsV2.createContainer({
+      accentColor: role.color || config.colors.primary,
+      components: [
+        componentsV2.createSection({
+          text: mdText,
+          accessory: role.iconURL({ size: 512 }) ? componentsV2.createThumbnail(role.iconURL({ size: 512 })) : undefined
+        })
+      ]
+    });
 
-    return interaction.reply({ embeds: [embed] });
+    return componentsV2.replyToInteraction(interaction, [container]);
   }
 };

@@ -1,43 +1,42 @@
 const { SlashCommandBuilder } = require('discord.js');
 const db = require('../../database/db');
-const levelHelper = require('../../utils/levelHelper');
 const componentsV2 = require('../../utils/componentsV2');
 const config = require('../../config');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('top-spotters')
-    .setDescription('Displays the top 10 community spotters ranked by Level and XP')
-    .setDMPermission(false),
+    .setName('top-invites')
+    .setDescription('Display the top inviters leaderboard on the server'),
 
   async execute(interaction) {
     const guild = interaction.guild;
-    const topUsers = db.getTopUsersByXP(guild.id, 10);
+    const topInviters = db.getTopInviters(guild.id, 10);
 
-    if (!topUsers || topUsers.length === 0) {
+    if (!topInviters || topInviters.length === 0) {
       return interaction.reply({
-        content: 'ℹ️ No members have earned Spotter XP yet. Upload photos in `#photo-submit` and vote to get on the leaderboard!',
+        content: 'ℹ️ No members have recorded invites yet on this server.',
         flags: 64
       });
     }
 
     const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
-    let listText = `# 🌟 Top Community Spotters & Aviators\n\n`;
+    let leaderboardText = `# 🏆 Top Inviters Leaderboard\n\n`;
 
-    for (let i = 0; i < topUsers.length; i++) {
-      const u = topUsers[i];
+    for (let i = 0; i < topInviters.length; i++) {
+      const row = topInviters[i];
       const medal = medals[i] || `${i + 1}.`;
-      const rankTitle = levelHelper.getRankTitle(u.level);
-      listText += `${medal} <@${u.user_id}> — **Level ${u.level}** (*${rankTitle}*)\n   └ ✨ **${u.xp.toLocaleString()} XP**\n\n`;
+      const netTotal = Math.max(0, (row.regular || 0) + (row.bonus || 0) - (row.left || 0) - (row.fake || 0));
+
+      leaderboardText += `${medal} <@${row.user_id}> — **${netTotal} invites** *(✅ ${row.regular || 0} | ⛔ ${row.left || 0} | 🎁 ${row.bonus || 0})*\n`;
     }
 
-    listText += `*Type \`/rank\` to check your personal spotter stats!*`;
+    leaderboardText += `\n*Track your invites anytime using \`/invites\`!*`;
 
     const container = componentsV2.createContainer({
       accentColor: config.colors.primary,
       components: [
         componentsV2.createSection({
-          text: listText,
+          text: leaderboardText,
           accessory: guild.iconURL ? componentsV2.createThumbnail(guild.iconURL({ dynamic: true })) : null
         })
       ]

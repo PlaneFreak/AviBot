@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const trollTracker = require('../../data/trollTracker');
 const config = require('../../config');
 
@@ -31,31 +32,36 @@ module.exports = {
 
     if (action === 'stop') {
       const removed = trollTracker.removeTroll(targetUser.id);
-      const embed = new EmbedBuilder()
-        .setColor(config.colors.primary)
-        .setTitle('🛑 Fun Responder Deactivated')
-        .setDescription(
-          removed
-            ? `Photo comments deactivated for **${targetUser.tag}**.`
-            : `**${targetUser.tag}** was not active in the responder.`
-        )
-        .setFooter({ text: config.footerText });
-      return interaction.reply({ embeds: [embed], ephemeral: true });
+      const stopContainer = componentsV2.createContainer({
+        accentColor: config.colors.primary,
+        components: [
+          componentsV2.createSection({
+            text: `# 🛑 Fun Responder Deactivated\n\n` +
+                  (removed
+                    ? `Photo comments deactivated for **${targetUser.tag}**.\n\n`
+                    : `**${targetUser.tag}** was not active in the responder.\n\n`) +
+                  `*${config.footerText}*`
+          })
+        ]
+      });
+      return componentsV2.replyToInteraction(interaction, [stopContainer], { ephemeral: true });
     }
 
     const expiresAt = trollTracker.addTroll(targetUser.id, 10 * 60 * 1000); // 10 mins
     const expiresAtSeconds = Math.floor(expiresAt / 1000);
 
-    const embed = new EmbedBuilder()
-      .setColor(config.colors.success)
-      .setTitle('🎉 Fun Photo Responder Activated!')
-      .setDescription(
-        `For the next **10 minutes** (<t:${expiresAtSeconds}:R>), every picture or image posted by **${targetUser.tag}** will receive a random funny aviation comment!\n\n` +
-        `*To stop early, type \`?troll stop @user\` or use \`/troll target:@user action:Stop\`.*`
-      )
-      .setFooter({ text: `${config.footerText} • 10-Minute Timer Active` })
-      .setTimestamp();
+    const startContainer = componentsV2.createContainer({
+      accentColor: config.colors.success,
+      components: [
+        componentsV2.createSection({
+          text: `# 🎉 Fun Photo Responder Activated!\n\n` +
+                `For the next **10 minutes** (<t:${expiresAtSeconds}:R>), every picture or image posted by **${targetUser.tag}** will receive a random funny aviation comment!\n\n` +
+                `*To stop early, type \`?troll stop @user\` or use \`/troll target:@user action:Stop\`.*\n\n` +
+                `*${config.footerText} • 10-Minute Timer Active*`
+        })
+      ]
+    });
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await componentsV2.replyToInteraction(interaction, [startContainer], { ephemeral: true });
   }
 };

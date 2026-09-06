@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const config = require('../../config');
 
 module.exports = {
@@ -47,20 +48,29 @@ module.exports = {
       });
     }
 
-    await member.timeout(null, `${interaction.user.tag}: ${reason}`);
+    try {
+      await member.timeout(null, `${interaction.user.tag}: ${reason}`);
+    } catch (err) {
+      return interaction.reply({
+        content: `❌ Failed to remove timeout: ${err.message}`,
+        ephemeral: true
+      });
+    }
 
-    const untimeoutEmbed = new EmbedBuilder()
-      .setColor(config.colors.success)
-      .setTitle(`${config.emojis.shield} Timeout Removed`)
-      .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-      .addFields(
-        { name: 'User', value: `${targetUser.tag} (\`${targetUser.id}\`)`, inline: true },
-        { name: 'Moderator', value: `${interaction.user.tag}`, inline: true },
-        { name: 'Reason', value: reason }
-      )
-      .setFooter({ text: config.footerText })
-      .setTimestamp();
+    const untimeoutContainer = componentsV2.createContainer({
+      accentColor: config.colors.success,
+      components: [
+        componentsV2.createSection({
+          text: `# ${config.emojis.shield} Timeout Removed\n\n` +
+                `**User**\n${targetUser.tag} (\`${targetUser.id}\`)\n\n` +
+                `**Moderator**\n${interaction.user.tag}\n\n` +
+                `**Reason**\n${reason}\n\n` +
+                `*${config.footerText}*`,
+          accessory: componentsV2.createThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
+        })
+      ]
+    });
 
-    await interaction.reply({ embeds: [untimeoutEmbed] });
+    await componentsV2.replyToInteraction(interaction, [untimeoutContainer]);
   }
 };

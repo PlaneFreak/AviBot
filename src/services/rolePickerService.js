@@ -1,5 +1,6 @@
-const { ChannelType, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { ChannelType, PermissionFlagsBits, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const config = require('../config');
+const componentsV2 = require('../utils/componentsV2');
 
 const ROLES_CHANNEL_NAME = '🎨ㆍroles';
 
@@ -161,36 +162,10 @@ module.exports = {
     await this.ensureRolesExist(guild);
 
     const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
-    const hasPanel = messages && messages.some(m => m.author.id === guild.client.user.id && m.embeds.length > 0);
+    const hasPanel = messages && messages.some(m => m.author.id === guild.client.user.id && m.flags.has(32768));
 
     // If already posted, skip to avoid spam
     if (hasPanel) return;
-
-    // Panel 1: Identity & Age & Continent
-    const embed1 = new EmbedBuilder()
-      .setColor(config.colors.primary)
-      .setTitle('🎨 Spotter Profile & Community Roles')
-      .setDescription(
-        `Customize your spotter profile! Choose your **Age Group**, **Aviation Passion**, and **Home Continent** below to receive specialty badges and connect with local spotters.`
-      )
-      .addFields(
-        {
-          name: '1️⃣ Age Group',
-          value: '`🔞ㆍUnder 18` or `🔞ㆍ18+`',
-          inline: true
-        },
-        {
-          name: '2️⃣ Aviation Identity',
-          value: '`📸ㆍPlanespotter`, `✈️ㆍEnthusiast`, `👨‍✈️ㆍPilot`, `🕹️ㆍSimmer`',
-          inline: true
-        },
-        {
-          name: '3️⃣ Home Continent',
-          value: '`🌍 Europe`, `🌎 North America`, `🌏 Asia`, etc.',
-          inline: false
-        }
-      )
-      .setFooter({ text: `${config.footerText} • Select your roles from the dropdowns below!` });
 
     const ageSelect = new StringSelectMenuBuilder()
       .setCustomId('select_role_age')
@@ -237,35 +212,25 @@ module.exports = {
         )
       );
 
-    await channel.send({
-      embeds: [embed1],
+    // Panel 1: Identity & Age & Continent
+    const container1 = componentsV2.createContainer({
+      accentColor: config.colors.primary,
       components: [
-        new ActionRowBuilder().addComponents(ageSelect),
-        new ActionRowBuilder().addComponents(passionSelect),
-        new ActionRowBuilder().addComponents(continentSelect)
+        componentsV2.createSection({
+          text: '# 🎨 Spotter Profile & Community Roles\n\n' +
+            'Customize your spotter profile! Choose your **Age Group**, **Aviation Passion**, and **Home Continent** below to receive specialty badges and connect with local spotters.\n\n' +
+            '**1️⃣ Age Group**\n`🔞ㆍUnder 18` or `🔞ㆍ18+`\n\n' +
+            '**2️⃣ Aviation Identity**\n`📸ㆍPlanespotter`, `✈️ㆍEnthusiast`, `👨‍✈️ㆍPilot`, `🕹️ㆍSimmer`\n\n' +
+            '**3️⃣ Home Continent**\n`🌍 Europe`, `🌎 North America`, `🌏 Asia`, etc.\n\n' +
+            `*${config.footerText} • Select your roles from the dropdowns below!*`
+        }),
+        { type: 1, components: [ageSelect.toJSON()] },
+        { type: 1, components: [passionSelect.toJSON()] },
+        { type: 1, components: [continentSelect.toJSON()] }
       ]
     });
 
-    // Panel 2: Photography Gear (Camera Brand & Lens Brand)
-    const embed2 = new EmbedBuilder()
-      .setColor(0x3498DB)
-      .setTitle('📷 Photography Gear & Optics')
-      .setDescription(
-        `Show the community what camera bodies and telephoto lenses you use for planespotting!`
-      )
-      .addFields(
-        {
-          name: '📷 Camera Brand',
-          value: '`Sony`, `Canon`, `Nikon`, `Fujifilm`, `Lumix`, `OM System`, `Smartphone`',
-          inline: true
-        },
-        {
-          name: '🔭 Lens Brand',
-          value: '`Sony GM`, `Canon L`, `Nikkor`, `Sigma`, `Tamron`, `Samyang`, `Kit Glass`',
-          inline: true
-        }
-      )
-      .setFooter({ text: `${config.footerText} • Select multiple brands if applicable!` });
+    await componentsV2.sendToChannel(guild.client, channel.id, [container1]);
 
     const cameraSelect = new StringSelectMenuBuilder()
       .setCustomId('select_role_camera')
@@ -297,13 +262,23 @@ module.exports = {
         )
       );
 
-    await channel.send({
-      embeds: [embed2],
+    // Panel 2: Photography Gear (Camera Brand & Lens Brand)
+    const container2 = componentsV2.createContainer({
+      accentColor: 0x3498DB,
       components: [
-        new ActionRowBuilder().addComponents(cameraSelect),
-        new ActionRowBuilder().addComponents(lensSelect)
+        componentsV2.createSection({
+          text: '# 📷 Photography Gear & Optics\n\n' +
+            'Show the community what camera bodies and telephoto lenses you use for planespotting!\n\n' +
+            '**📷 Camera Brand**\n`Sony`, `Canon`, `Nikon`, `Fujifilm`, `Lumix`, `OM System`, `Smartphone`\n\n' +
+            '**🔭 Lens Brand**\n`Sony GM`, `Canon L`, `Nikkor`, `Sigma`, `Tamron`, `Samyang`, `Kit Glass`\n\n' +
+            `*${config.footerText} • Select multiple brands if applicable!*`
+        }),
+        { type: 1, components: [cameraSelect.toJSON()] },
+        { type: 1, components: [lensSelect.toJSON()] }
       ]
     });
+
+    await componentsV2.sendToChannel(guild.client, channel.id, [container2]);
 
     console.log(`🎨 Role Picker panels published in #${channel.name} (${guild.name})`);
   }

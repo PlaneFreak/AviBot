@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const config = require('../../config');
 
 module.exports = {
@@ -42,35 +43,39 @@ module.exports = {
 
     // Attempt to DM the member
     let dmSent = true;
-    const dmEmbed = new EmbedBuilder()
-      .setColor(config.colors.warning)
-      .setTitle(`⚠️ Formal Warning in ${interaction.guild.name}`)
-      .addFields(
-        { name: 'Reason', value: reason },
-        { name: 'Moderator', value: interaction.user.tag }
-      )
-      .setFooter({ text: 'Please follow server rules to avoid further moderation actions.' })
-      .setTimestamp();
+    const dmContainer = componentsV2.createContainer({
+      accentColor: config.colors.warning,
+      components: [
+        componentsV2.createSection({
+          text: `# ⚠️ Formal Warning in ${interaction.guild.name}\n\n` +
+                `**Reason**\n${reason}\n\n` +
+                `**Moderator**\n${interaction.user.tag}\n\n` +
+                `*Please follow server rules to avoid further moderation actions.*`
+        })
+      ]
+    });
 
     try {
-      await member.send({ embeds: [dmEmbed] });
+      await componentsV2.sendDM(interaction.client, member.id, [dmContainer]);
     } catch {
       dmSent = false;
     }
 
-    const warnEmbed = new EmbedBuilder()
-      .setColor(config.colors.warning)
-      .setTitle(`${config.emojis.warning} Member Warned`)
-      .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-      .addFields(
-        { name: 'User', value: `${targetUser.tag} (\`${targetUser.id}\`)`, inline: true },
-        { name: 'Moderator', value: `${interaction.user.tag}`, inline: true },
-        { name: 'Reason', value: reason },
-        { name: 'DM Notification', value: dmSent ? '✅ Delivered' : '❌ Could not DM user (DMs disabled)', inline: true }
-      )
-      .setFooter({ text: config.footerText })
-      .setTimestamp();
+    const warnContainer = componentsV2.createContainer({
+      accentColor: config.colors.warning,
+      components: [
+        componentsV2.createSection({
+          text: `# ${config.emojis.warning} Member Warned\n\n` +
+                `**User**\n${targetUser.tag} (\`${targetUser.id}\`)\n\n` +
+                `**Moderator**\n${interaction.user.tag}\n\n` +
+                `**Reason**\n${reason}\n\n` +
+                `**DM Notification**\n${dmSent ? '✅ Delivered' : '❌ Could not DM user (DMs disabled)'}\n\n` +
+                `*${config.footerText}*`,
+          accessory: componentsV2.createThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
+        })
+      ]
+    });
 
-    await interaction.reply({ embeds: [warnEmbed] });
+    await componentsV2.replyToInteraction(interaction, [warnContainer]);
   }
 };

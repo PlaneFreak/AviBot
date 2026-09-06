@@ -1,6 +1,7 @@
-const { Events, EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType } = require('discord.js');
+const { Events, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType } = require('discord.js');
 const config = require('../config');
 const appealHelper = require('../utils/appealHelper');
+const componentsV2 = require('../utils/componentsV2');
 
 module.exports = {
   name: Events.InteractionCreate,
@@ -24,21 +25,19 @@ module.exports = {
       } catch (error) {
         console.error(`Error executing /${interaction.commandName}:`, error);
 
-        const errorEmbed = new EmbedBuilder()
-          .setColor(config.colors.error)
-          .setTitle(`${config.emojis.error} Command Execution Error`)
-          .setDescription('There was an unexpected error while executing this command.')
-          .addFields({
-            name: 'Error Details',
-            value: `\`\`\`${(error.message || 'Unknown error').slice(0, 1000)}\`\`\``
-          })
-          .setFooter({ text: config.footerText })
-          .setTimestamp();
+        const errorContainer = componentsV2.createContainer({
+          accentColor: config.colors.error,
+          components: [
+            componentsV2.createSection({
+              text: `# ${config.emojis.error} Command Execution Error\n\nThere was an unexpected error while executing this command.\n\n**Error Details**\n\`\`\`${(error.message || 'Unknown error').slice(0, 1000)}\`\`\`\n\n*${config.footerText}*`
+            })
+          ]
+        });
 
         if (interaction.replied || interaction.deferred) {
-          await interaction.followUp({ embeds: [errorEmbed], ephemeral: true }).catch(() => {});
+          await componentsV2.editInteractionReply(interaction, [errorContainer]).catch(() => {});
         } else {
-          await interaction.reply({ embeds: [errorEmbed], ephemeral: true }).catch(() => {});
+          await componentsV2.replyToInteraction(interaction, [errorContainer], { ephemeral: true }).catch(() => {});
         }
       }
       return;
@@ -174,18 +173,16 @@ module.exports = {
             ViewChannel: true
           }, { reason: `Chat activated by ${interaction.user.tag}` });
 
-          const chatEmbed = new EmbedBuilder()
-            .setColor(config.colors.success)
-            .setTitle('💬 Chat Activated')
-            .setDescription(
-              `Chat has been enabled for <@${targetUserId}> in this channel.\n` +
-              `You can now discuss your case directly with the server moderation team.\n\n` +
-              `*Staff can close this chat at any time by typing \`?chatstop\`.*`
-            )
-            .setFooter({ text: config.footerText })
-            .setTimestamp();
+          const chatContainer = componentsV2.createContainer({
+            accentColor: config.colors.success,
+            components: [
+              componentsV2.createSection({
+                text: `# 💬 Chat Activated\n\nChat has been enabled for <@${targetUserId}> in this channel.\nYou can now discuss your case directly with the server moderation team.\n\n*Staff can close this chat at any time by typing \`?chatstop\`.*\n\n*${config.footerText}*`
+              })
+            ]
+          });
 
-          await channel.send({ embeds: [chatEmbed] });
+          await componentsV2.sendToChannel(client, channel.id, [chatContainer]);
 
           return interaction.reply({
             content: '✅ Chat has been activated for this channel.',
@@ -237,18 +234,16 @@ module.exports = {
             console.error('Error posting verified welcome card:', err);
           });
 
-          const successEmbed = new EmbedBuilder()
-            .setColor(config.colors.success)
-            .setTitle('🎉 Verification Successful!')
-            .setDescription(
-              `Welcome to **${guild.name}**, ${member}!\n\n` +
-              `You have been granted the **@${targetRole.name}** role and now have full access to all chat, spotting, media, and voice channels.\n\n` +
-              `*Enjoy your stay and have fun!* ✈️`
-            )
-            .setFooter({ text: config.footerText })
-            .setTimestamp();
+          const successContainer = componentsV2.createContainer({
+            accentColor: config.colors.success,
+            components: [
+              componentsV2.createSection({
+                text: `# 🎉 Verification Successful!\n\nWelcome to **${guild.name}**, ${member}!\n\nYou have been granted the **@${targetRole.name}** role and now have full access to all chat, spotting, media, and voice channels.\n\n*Enjoy your stay and have fun!* ✈️\n\n*${config.footerText}*`
+              })
+            ]
+          });
 
-          return interaction.reply({ embeds: [successEmbed], ephemeral: true });
+          return componentsV2.replyToInteraction(interaction, [successContainer], { ephemeral: true });
         } catch (err) {
           console.error('Error assigning verification role:', err);
           return interaction.reply({
@@ -286,13 +281,15 @@ module.exports = {
             await suspensionManager.restoreMember(guild, targetUserId);
 
             if (targetUser) {
-              const dm = new EmbedBuilder()
-                .setColor(config.colors.success)
-                .setTitle(`✅ Appeal Accepted • ${guild.name}`)
-                .setDescription(`Your appeal for your **${punishmentType.toUpperCase()}** in **${guild.name}** has been accepted by the staff team! Your roles and full server access have been restored.`)
-                .setFooter({ text: config.footerText })
-                .setTimestamp();
-              await targetUser.send({ embeds: [dm] }).catch(() => {});
+              const dmContainer = componentsV2.createContainer({
+                accentColor: config.colors.success,
+                components: [
+                  componentsV2.createSection({
+                    text: `# ✅ Appeal Accepted • ${guild.name}\n\nYour appeal for your **${punishmentType.toUpperCase()}** in **${guild.name}** has been accepted by the staff team! Your roles and full server access have been restored.\n\n*${config.footerText}*`
+                  })
+                ]
+              });
+              await componentsV2.sendDM(client, targetUser.id, [dmContainer]).catch(() => {});
             }
             actionDetails = 'Member restored & suspension lifted.';
           } else if (punishmentType === 'timeout') {
@@ -301,13 +298,15 @@ module.exports = {
               await targetMember.timeout(null, `Appeal accepted by ${interaction.user.tag}`);
             }
             if (targetUser) {
-              const dm = new EmbedBuilder()
-                .setColor(config.colors.success)
-                .setTitle(`✅ Timeout Appeal Accepted • ${guild.name}`)
-                .setDescription(`Your timeout in **${guild.name}** has been lifted by the staff team!`)
-                .setFooter({ text: config.footerText })
-                .setTimestamp();
-              await targetUser.send({ embeds: [dm] }).catch(() => {});
+              const dmContainer = componentsV2.createContainer({
+                accentColor: config.colors.success,
+                components: [
+                  componentsV2.createSection({
+                    text: `# ✅ Timeout Appeal Accepted • ${guild.name}\n\nYour timeout in **${guild.name}** has been lifted by the staff team!\n\n*${config.footerText}*`
+                  })
+                ]
+              });
+              await componentsV2.sendDM(client, targetUser.id, [dmContainer]).catch(() => {});
             }
             actionDetails = 'Timeout lifted successfully.';
           }
@@ -318,22 +317,41 @@ module.exports = {
 
         // Update original appeal message
         const originalEmbed = interaction.message.embeds[0];
-        const updatedEmbed = EmbedBuilder.from(originalEmbed)
-          .setColor(config.colors.success)
-          .spliceFields(-1, 1, {
-            name: 'Status',
-            value: `✅ **ACCEPTED** by ${interaction.user} (<t:${Math.floor(Date.now() / 1000)}:R>)\n*${actionDetails}*`
-          });
+        let newMarkdown = '';
 
-        const disabledRow = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId('appeal_accepted_btn')
-            .setLabel(`Accepted by ${interaction.user.username}`)
-            .setStyle(ButtonStyle.Success)
-            .setDisabled(true)
-        );
+        if (originalEmbed && originalEmbed.fields && originalEmbed.fields.length > 0) {
+            newMarkdown += `# ${originalEmbed.title || 'Appeal'}\n\n`;
+            originalEmbed.fields.slice(0, -1).forEach(f => {
+                newMarkdown += `**${f.name}**\n${f.value}\n\n`;
+            });
+        } else if (originalEmbed && originalEmbed.description) {
+            // If already V2 format
+            newMarkdown = originalEmbed.description.replace(/\*\*Status\*\*\n[\s\S]*$/i, '');
+        }
 
-        await interaction.message.edit({ embeds: [updatedEmbed], components: [disabledRow] });
+        newMarkdown += `**Status**\n✅ **ACCEPTED** by ${interaction.user} (<t:${Math.floor(Date.now() / 1000)}:R>)\n*${actionDetails}*\n\n*${config.footerText}*`;
+
+        const disabledRow = componentsV2.createActionRow([
+          componentsV2.createButton({
+            customId: 'appeal_accepted_btn',
+            label: `Accepted by ${interaction.user.username}`,
+            style: 3, // ButtonStyle.Success
+            disabled: true
+          })
+        ]);
+
+        const updatedContainer = componentsV2.createContainer({
+          accentColor: config.colors.success,
+          components: [
+            componentsV2.createSection({
+              text: newMarkdown,
+              accessory: originalEmbed && originalEmbed.thumbnail ? componentsV2.createThumbnail(originalEmbed.thumbnail.url) : null
+            }),
+            disabledRow
+          ]
+        });
+
+        await interaction.message.edit({ embeds: [], components: [updatedContainer], flags: 32768 });
         return;
       }
 
@@ -360,13 +378,15 @@ module.exports = {
         const targetUser = await client.users.fetch(targetUserId).catch(() => null);
 
         if (targetUser) {
-          const dm = new EmbedBuilder()
-            .setColor(config.colors.error)
-            .setTitle(`❌ Appeal Rejected • ${guild.name}`)
-            .setDescription(`Your appeal for your **${punishmentType.toUpperCase()}** in **${guild.name}** has been reviewed and rejected by the staff team. The punishment will now be finalized.`)
-            .setFooter({ text: config.footerText })
-            .setTimestamp();
-          await targetUser.send({ embeds: [dm] }).catch(() => {});
+          const dmContainer = componentsV2.createContainer({
+            accentColor: config.colors.error,
+            components: [
+              componentsV2.createSection({
+                text: `# ❌ Appeal Rejected • ${guild.name}\n\nYour appeal for your **${punishmentType.toUpperCase()}** in **${guild.name}** has been reviewed and rejected by the staff team. The punishment will now be finalized.\n\n*${config.footerText}*`
+              })
+            ]
+          });
+          await componentsV2.sendDM(client, targetUser.id, [dmContainer]).catch(() => {});
         }
 
         // Finalize (ban or kick immediately)
@@ -374,22 +394,40 @@ module.exports = {
 
         // Update original appeal message
         const originalEmbed = interaction.message.embeds[0];
-        const updatedEmbed = EmbedBuilder.from(originalEmbed)
-          .setColor(config.colors.error)
-          .spliceFields(-1, 1, {
-            name: 'Status',
-            value: `❌ **REJECTED** by ${interaction.user} (<t:${Math.floor(Date.now() / 1000)}:R>)`
-          });
+        let newMarkdown = '';
 
-        const disabledRow = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId('appeal_rejected_btn')
-            .setLabel(`Rejected by ${interaction.user.username}`)
-            .setStyle(ButtonStyle.Danger)
-            .setDisabled(true)
-        );
+        if (originalEmbed && originalEmbed.fields && originalEmbed.fields.length > 0) {
+            newMarkdown += `# ${originalEmbed.title || 'Appeal'}\n\n`;
+            originalEmbed.fields.slice(0, -1).forEach(f => {
+                newMarkdown += `**${f.name}**\n${f.value}\n\n`;
+            });
+        } else if (originalEmbed && originalEmbed.description) {
+            newMarkdown = originalEmbed.description.replace(/\*\*Status\*\*\n[\s\S]*$/i, '');
+        }
 
-        await interaction.message.edit({ embeds: [updatedEmbed], components: [disabledRow] });
+        newMarkdown += `**Status**\n❌ **REJECTED** by ${interaction.user} (<t:${Math.floor(Date.now() / 1000)}:R>)\n\n*${config.footerText}*`;
+
+        const disabledRow = componentsV2.createActionRow([
+          componentsV2.createButton({
+            customId: 'appeal_rejected_btn',
+            label: `Rejected by ${interaction.user.username}`,
+            style: 4, // ButtonStyle.Danger
+            disabled: true
+          })
+        ]);
+
+        const updatedContainer = componentsV2.createContainer({
+          accentColor: config.colors.error,
+          components: [
+            componentsV2.createSection({
+              text: newMarkdown,
+              accessory: originalEmbed && originalEmbed.thumbnail ? componentsV2.createThumbnail(originalEmbed.thumbnail.url) : null
+            }),
+            disabledRow
+          ]
+        });
+
+        await interaction.message.edit({ embeds: [], components: [updatedContainer], flags: 32768 });
         return;
       }
     }
@@ -425,58 +463,41 @@ module.exports = {
           });
         }
 
-        // Send Appeal Embed to Staff Appeals Channel
-        const appealEmbed = new EmbedBuilder()
-          .setColor(config.colors.warning)
-          .setTitle(`⚖️ Punishment Appeal • ${punishmentType.toUpperCase()}`)
-          .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
-          .addFields(
-            {
-              name: '👤 User',
-              value: `${interaction.user.tag} (${interaction.user})\n\`${interaction.user.id}\``,
-              inline: true
-            },
-            {
-              name: '🔨 Punishment',
-              value: `\`${punishmentType.toUpperCase()}\``,
-              inline: true
-            },
-            {
-              name: '📅 Submitted At',
-              value: `<t:${Math.floor(Date.now() / 1000)}:F>`,
-              inline: true
-            },
-            {
-              name: '📝 Appeal Reason / Explanation',
-              value: reason,
-              inline: false
-            },
-            {
-              name: '💬 Additional Context / Apology',
-              value: context,
-              inline: false
-            },
-            {
-              name: 'Status',
-              value: '⏳ **Pending Staff Review**',
-              inline: false
-            }
-          )
-          .setFooter({ text: `${config.footerText} • Click buttons below to resolve` })
-          .setTimestamp();
+        // Send Appeal Container to Staff Appeals Channel
+        const staffRowBuilder = appealHelper.createAppealStaffRow(guildId, interaction.user.id, punishmentType);
+        const actionRow = componentsV2.createActionRow(staffRowBuilder.components.map(b => b.data || b));
 
-        const staffRow = appealHelper.createAppealStaffRow(guildId, interaction.user.id, punishmentType);
-        await appealsChannel.send({ embeds: [appealEmbed], components: [staffRow] });
+        const appealContainer = componentsV2.createContainer({
+          accentColor: config.colors.warning,
+          components: [
+            componentsV2.createSection({
+              text: `# ⚖️ Punishment Appeal • ${punishmentType.toUpperCase()}\n\n` +
+                `**👤 User**\n${interaction.user.tag} (${interaction.user})\n\`${interaction.user.id}\`\n\n` +
+                `**🔨 Punishment**\n\`${punishmentType.toUpperCase()}\`\n\n` +
+                `**📅 Submitted At**\n<t:${Math.floor(Date.now() / 1000)}:F>\n\n` +
+                `**📝 Appeal Reason / Explanation**\n${reason}\n\n` +
+                `**💬 Additional Context / Apology**\n${context}\n\n` +
+                `**Status**\n⏳ **Pending Staff Review**\n\n` +
+                `*${config.footerText} • Click buttons below to resolve*`,
+              accessory: componentsV2.createThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
+            }),
+            actionRow
+          ]
+        });
+
+        await componentsV2.sendToChannel(client, appealsChannel.id, [appealContainer]);
 
         // Confirm to user in DM
-        const confirmationEmbed = new EmbedBuilder()
-          .setColor(config.colors.success)
-          .setTitle('✅ Appeal Submitted Successfully')
-          .setDescription(`Your appeal for **${guild.name}** has been delivered to the staff team in ${appealsChannel.name}.\n\nYou will be notified via DM when a moderator reviews your request.`)
-          .setFooter({ text: config.footerText })
-          .setTimestamp();
+        const confirmContainer = componentsV2.createContainer({
+          accentColor: config.colors.success,
+          components: [
+            componentsV2.createSection({
+              text: `# ✅ Appeal Submitted Successfully\n\nYour appeal for **${guild.name}** has been delivered to the staff team in ${appealsChannel.name}.\n\nYou will be notified via DM when a moderator reviews your request.\n\n*${config.footerText}*`
+            })
+          ]
+        });
 
-        return interaction.reply({ embeds: [confirmationEmbed], ephemeral: true });
+        return componentsV2.replyToInteraction(interaction, [confirmContainer], { ephemeral: true });
       }
     }
 

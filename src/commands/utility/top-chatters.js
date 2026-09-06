@@ -1,6 +1,7 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const db = require('../../database/db');
 const levelHelper = require('../../utils/levelHelper');
+const componentsV2 = require('../../utils/componentsV2');
 const config = require('../../config');
 
 module.exports = {
@@ -16,34 +17,36 @@ module.exports = {
     if (!topUsers || topUsers.length === 0) {
       return interaction.reply({
         content: 'ℹ️ No activity data recorded yet. Start chatting in text channels to earn XP!',
-        ephemeral: true
+        flags: 64
       });
     }
 
-    const leaderboardLines = [];
-    const medals = ['🥇', '🥈', '🥉'];
+    const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+    let listText = `# 💬 Top Active Chatters — ${guild.name}\n\n`;
 
     for (let i = 0; i < topUsers.length; i++) {
       const u = topUsers[i];
-      const medal = i < 3 ? medals[i] : `**#${i + 1}**`;
+      const medal = medals[i] || `${i + 1}.`;
       const levelData = levelHelper.calculateChatLevelData(u.chat_xp || 0);
 
-      leaderboardLines.push(
-        `${medal} <@${u.user_id}> • **Level ${levelData.level}** (*${levelData.rankTitle}*)\n` +
-        `   └ ✨ **${u.chat_xp || 0}** Chat XP • 💬 **${u.messages_count || 0}** messages`
-      );
+      listText += `${medal} <@${u.user_id}> — **Level ${levelData.level}** (*${levelData.rankTitle}*)\n   └ ✨ **${(u.chat_xp || 0).toLocaleString()}** Chat XP • 💬 **${(u.messages_count || 0).toLocaleString()}** messages\n\n`;
     }
 
-    const embed = new EmbedBuilder()
-      .setColor(config.colors.primary)
-      .setTitle(`💬 Top Active Chatters — ${guild.name}`)
-      .setDescription(
-        `Here are the most active community members based on chat activity level:\n\n` +
-        leaderboardLines.join('\n\n')
-      )
-      .setFooter({ text: `${config.footerText} • Anti-spam cooldown active (15-25 XP/min)` })
-      .setTimestamp();
+    listText += `*Chat activity awards 15–25 XP per minute in text channels.*`;
 
-    await interaction.reply({ embeds: [embed] });
+    const container = componentsV2.createContainer({
+      accentColor: config.colors.primary,
+      components: [
+        componentsV2.createSection({
+          text: listText,
+          accessory: guild.iconURL ? componentsV2.createThumbnail(guild.iconURL({ dynamic: true })) : null
+        })
+      ]
+    });
+
+    return interaction.reply({
+      flags: 32768,
+      components: [container]
+    });
   }
 };

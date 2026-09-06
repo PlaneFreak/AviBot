@@ -24,8 +24,8 @@ module.exports = {
     });
 
     // Automatically configure channel slowmodes across the server
-    try {
-      for (const guild of client.guilds.cache.values()) {
+    for (const guild of client.guilds.cache.values()) {
+      try {
         const channels = await guild.channels.fetch().catch(() => null);
         if (!channels) continue;
 
@@ -70,10 +70,10 @@ module.exports = {
             continue;
           }
 
-          // 2. Check if channel is read-only (rules, news, welcome, roles, photo-leaderboard, pic-rating, appeal-hub, etc.)
+          // 2. Check if channel is read-only (rules, news, welcome, roles, photo-leaderboard, pic-rating, appeal-hub, instagram, etc.)
           const overwrites = channel.permissionOverwrites.cache.get(everyoneRole.id);
           const isEveryoneDenied = overwrites && overwrites.deny.has(PermissionFlagsBits.SendMessages);
-          const isReadOnlyName = /news|rules|welcome|roles|leaderboard|pic-rating|appeal-hub|staff-news/i.test(channel.name);
+          const isReadOnlyName = /news|rules|welcome|roles|leaderboard|pic-rating|appeal-hub|staff-news|instagram|insta/i.test(channel.name);
 
           if (isEveryoneDenied || isReadOnlyName) {
             // Read-only channel, leave slowmode at 0
@@ -196,9 +196,17 @@ module.exports = {
         // 13. Ensure Events Channel
         const eventService = require('../services/eventService');
         await eventService.getOrCreateEventsChannel(guild).catch(() => {});
+
+        // 14. Initialize Real-Time Invite Tracker Cache
+        const inviteService = require('../services/inviteService');
+        await inviteService.cacheGuildInvites(guild).catch(() => {});
+
+        // 15. Ensure Instagram Feed Channel in Important Category (directly below news)
+        const instagramService = require('../services/instagramService');
+        await instagramService.ensureInstagramChannel(guild).catch(() => {});
+      } catch (err) {
+        console.error(`Error applying channel configurations on ready for guild ${guild.id}:`, err.message);
       }
-    } catch (err) {
-      console.error('Error applying channel configurations on ready:', err.message);
     }
   }
 };

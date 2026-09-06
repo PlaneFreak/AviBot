@@ -23,22 +23,25 @@ module.exports = {
   },
 
   /**
-   * Helper to build a Section (type 9)
+   * Helper to build a Section (type 9 with accessory) or TextDisplay (type 10 without accessory)
    */
   createSection({ text, accessory = null }) {
-    const section = {
+    if (!accessory) {
+      return {
+        type: 10,
+        content: text
+      };
+    }
+    return {
       type: 9,
       components: [
         {
           type: 10,
           content: text
         }
-      ]
+      ],
+      accessory
     };
-    if (accessory) {
-      section.accessory = accessory;
-    }
-    return section;
   },
 
   /**
@@ -196,5 +199,56 @@ module.exports = {
     }
 
     return await client.rest.post(Routes.channelMessages(channelId), options);
+  },
+
+  /**
+   * Reply to a Discord interaction with Components V2
+   * Supports both ephemeral and non-ephemeral responses
+   */
+  async replyToInteraction(interaction, containers, { ephemeral = false, content = null } = {}) {
+    let flags = 32768; // IS_COMPONENTS_V2
+    if (ephemeral) flags |= 64; // EPHEMERAL
+
+    const payload = {
+      flags,
+      components: Array.isArray(containers) ? containers : [containers]
+    };
+    if (content) payload.content = content;
+
+    if (interaction.replied || interaction.deferred) {
+      return await interaction.editReply(payload);
+    }
+    return await interaction.reply(payload);
+  },
+
+  /**
+   * Edit a deferred interaction reply with Components V2
+   */
+  async editInteractionReply(interaction, containers, { content = null } = {}) {
+    const payload = {
+      flags: 32768,
+      components: Array.isArray(containers) ? containers : [containers]
+    };
+    if (content) payload.content = content;
+
+    return await interaction.editReply(payload);
+  },
+
+  /**
+   * Send Components V2 via DM to a user
+   */
+  async sendDM(client, userId, containers) {
+    try {
+      const dmChannel = await client.users.createDM(userId);
+      return await client.rest.post(Routes.channelMessages(dmChannel.id), {
+        body: {
+          flags: 32768,
+          components: Array.isArray(containers) ? containers : [containers]
+        }
+      });
+    } catch (err) {
+      // DMs may be disabled — fail silently like the old code
+      return null;
+    }
   }
 };

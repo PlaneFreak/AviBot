@@ -1,4 +1,4 @@
-const { PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { PermissionFlagsBits } = require('discord.js');
 const adminLogService = require('./adminLogService');
 const verificationService = require('./verificationService');
 
@@ -7,13 +7,24 @@ const RAID_THRESHOLD_JOINS = 6;       // 6 joins within 10 seconds
 const MIN_ACCOUNT_AGE_HOURS = 24;     // Flag accounts under 24 hours old
 const AUTO_UNLOCK_DURATION_MS = 10 * 60 * 1000; // 10 minutes lockdown duration
 
-let recentJoins = [];
-let isLockdownActive = false;
-let lockdownTimeout = null;
+const guildStates = new Map();
+
+function getGuildState(guildId) {
+  let state = guildStates.get(guildId);
+  if (!state) {
+    state = {
+      recentJoins: [],
+      isLockdownActive: false,
+      lockdownTimeout: null
+    };
+    guildStates.set(guildId, state);
+  }
+  return state;
+}
 
 module.exports = {
-  isLockdownActive() {
-    return isLockdownActive;
+  isLockdownActive(guildId) {
+    return getGuildState(guildId).isLockdownActive;
   },
 
   /**
@@ -26,7 +37,9 @@ module.exports = {
     const guild = member.guild;
     const accountAgeHours = (now - member.user.createdTimestamp) / (1000 * 60 * 60);
 
-    recentJoins.push({
+    const state = getGuildState(guild.id);
+
+    state.recentJoins.push({
       id: member.id,
       tag: member.user.tag,
       joinedAt: now,
@@ -34,15 +47,15 @@ module.exports = {
     });
 
     // Keep only joins in the sliding window
-    recentJoins = recentJoins.filter(j => now - j.joinedAt <= RAID_WINDOW_MS);
+    state.recentJoins = state.recentJoins.filter(j => now - j.joinedAt <= RAID_WINDOW_MS);
 
     // Check if Join Flood threshold is breached
-    if (recentJoins.length >= RAID_THRESHOLD_JOINS && !isLockdownActive) {
-      await this.activateLockdown(guild, `Mass Join Flood (${recentJoins.length} joins in ${RAID_WINDOW_MS / 1000}s)`);
+    if (state.recentJoins.length >= RAID_THRESHOLD_JOINS && !state.isLockdownActive) {
+      await this.activateLockdown(guild, `Mass Join Flood (${state.recentJoins.length} joins in ${RAID_WINDOW_MS / 1000}s)`);
     }
 
     // If lockdown is active and new account joined (<24h old), auto-timeout/quarantine
-    if (isLockdownActive && accountAgeHours < MIN_ACCOUNT_AGE_HOURS) {
+    if (state.isLockdownActive && accountAgeHours < MIN_ACCOUNT_AGE_HOURS) {
       await member.timeout(15 * 60 * 1000, '[Anti-Raid] Suspicious new account during active raid').catch(() => {});
       console.log(`🚨 Auto-timed out suspicious new account ${member.user.tag} (Age: ${accountAgeHours.toFixed(1)}h) during raid.`);
     }
@@ -52,8 +65,9 @@ module.exports = {
    * Activates Server Lockdown Mode
    */
   async activateLockdown(guild, reason = 'Automated Raid Detection') {
-    if (isLockdownActive) return;
-    isLockdownActive = true;
+    const state = getGuildState(guild.id);
+    if (state.isLockdownActive) return;
+    state.isLockdownActive = true;
 
     console.log(`🚨 [ANTI-RAID] Activating Server Lockdown for ${guild.name}: ${reason}`);
 
@@ -69,27 +83,23 @@ module.exports = {
     // Log to Admin Logs & Staff Channels
     const adminChannel = await adminLogService.getOrCreateAdminLogChannel(guild);
     if (adminChannel) {
-      const alertEmbed = new EmbedBuilder()
-        .setColor(0xE74C3C)
-        .setTitle('🚨 EMERGENCY SERVER LOCKDOWN ACTIVATED')
-        .setDescription(
-          `**Reason:** ${reason}\n` +
-          `**Status:** 🔒 Server verification locked to protect against raid!\n` +
-          `**Recent Joins:** ${recentJoins.length} users in the last 10 seconds\n\n` +
-          `*The lockdown will automatically lift in **10 minutes**, or staff can use \`/antiraid lockdown state:disable\` to reopen manually.*`
-        )
-        .setFooter({ text: 'AviBot Security Engine • Emergency Raid Defense' })
-        .setTimestamp();
+      const componentsV2 = require('../utils/componentsV2');
+      const alertContainer = componentsV2.createContainer({
+        accentColor: 0xE74C3C,
+        components: [
+          componentsV2.createSection({
+            text: `# 🚨 EMERGENCY SERVER LOCKDOWN ACTIVATED\n\n**Reason:** ${reason}\n**Status:** 🔒 Server verification locked to protect against raid!\n**Recent Joins:** ${state.recentJoins.length} users in the last 10 seconds\n\n*The lockdown will automatically lift in **10 minutes**, or staff can use \`/antiraid lockdown state:disable\` to reopen manually.*\n\n*AviBot Security Engine • Emergency Raid Defense*`
+          })
+        ]
+      });
 
-      await adminChannel.send({
-        content: '@here 🚨 **ATTENTION STAFF: RAID DETECTED!**',
-        embeds: [alertEmbed]
-      }).catch(() => {});
+      await adminChannel.send({ content: '@here 🚨 **ATTENTION STAFF: RAID DETECTED!**' }).catch(() => {});
+      await componentsV2.sendToChannel(guild.client, adminChannel.id, [alertContainer]).catch(() => {});
     }
 
     // Set auto-unlock timer
-    if (lockdownTimeout) clearTimeout(lockdownTimeout);
-    lockdownTimeout = setTimeout(async () => {
+    if (state.lockdownTimeout) clearTimeout(state.lockdownTimeout);
+    state.lockdownTimeout = setTimeout(async () => {
       await this.liftLockdown(guild, 'Automatic Timer (10m Elapsed)');
     }, AUTO_UNLOCK_DURATION_MS);
   },
@@ -98,9 +108,10 @@ module.exports = {
    * Lifts Server Lockdown Mode
    */
   async liftLockdown(guild, reason = 'Staff Manual Unlock') {
-    if (!isLockdownActive) return;
-    isLockdownActive = false;
-    if (lockdownTimeout) clearTimeout(lockdownTimeout);
+    const state = getGuildState(guild.id);
+    if (!state.isLockdownActive) return;
+    state.isLockdownActive = false;
+    if (state.lockdownTimeout) clearTimeout(state.lockdownTimeout);
 
     console.log(`🟢 [ANTI-RAID] Lifting Server Lockdown for ${guild.name}: ${reason}`);
 
@@ -117,23 +128,28 @@ module.exports = {
     // Log to Admin Logs
     const adminChannel = await adminLogService.getOrCreateAdminLogChannel(guild);
     if (adminChannel) {
-      const unlockEmbed = new EmbedBuilder()
-        .setColor(0x2ECC71)
-        .setTitle('🟢 Server Lockdown Lifted')
-        .setDescription(`**Status:** Server is back in normal operation mode.\n**Authorized by:** ${reason}`)
-        .setTimestamp();
+      const componentsV2 = require('../utils/componentsV2');
+      const unlockContainer = componentsV2.createContainer({
+        accentColor: 0x2ECC71,
+        components: [
+          componentsV2.createSection({
+            text: `# 🟢 Server Lockdown Lifted\n\n**Status:** Server is back in normal operation mode.\n**Authorized by:** ${reason}`
+          })
+        ]
+      });
 
-      await adminChannel.send({ embeds: [unlockEmbed] }).catch(() => {});
+      await componentsV2.sendToChannel(guild.client, adminChannel.id, [unlockContainer]).catch(() => {});
     }
   },
 
   /**
    * Returns current statistics
    */
-  getStatus() {
+  getStatus(guildId) {
+    const state = getGuildState(guildId);
     return {
-      isLockdownActive,
-      recentJoinCount: recentJoins.length,
+      isLockdownActive: state.isLockdownActive,
+      recentJoinCount: state.recentJoins.length,
       threshold: RAID_THRESHOLD_JOINS,
       windowSeconds: RAID_WINDOW_MS / 1000,
       minAccountAgeHours: MIN_ACCOUNT_AGE_HOURS

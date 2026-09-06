@@ -1,6 +1,7 @@
-const { Events, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { Events, PermissionFlagsBits, ChannelType } = require('discord.js');
 const stickyManager = require('../data/stickyManager');
 const config = require('../config');
+const componentsV2 = require('../utils/componentsV2');
 
 // Helper to format sticky message as plain text header
 function formatStickyMessage(content) {
@@ -48,56 +49,39 @@ module.exports = {
           });
         }
 
-        const appealEmbed = new EmbedBuilder()
-          .setColor(config.colors.warning)
-          .setTitle(`⚖️ Punishment Appeal • ${punishmentType.toUpperCase()} (Via DM Reply)`)
-          .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
-          .addFields(
-            {
-              name: '👤 User',
-              value: `${message.author.tag} (${message.author})\n\`${message.author.id}\``,
-              inline: true
-            },
-            {
-              name: '🔨 Punishment',
-              value: `\`${punishmentType.toUpperCase()}\``,
-              inline: true
-            },
-            {
-              name: '🛡️ Punished By',
-              value: originalMod,
-              inline: true
-            },
-            {
-              name: '⚠️ Original Reason',
-              value: originalReason,
-              inline: false
-            },
-            {
-              name: '📝 Appeal Message',
-              value: message.content.slice(0, 1000) || '*[Attached media or empty]*',
-              inline: false
-            },
-            {
-              name: 'Status',
-              value: '⏳ **Pending Staff Review**',
-              inline: false
-            }
-          )
-          .setFooter({ text: `${config.footerText} • Click buttons below to resolve` })
-          .setTimestamp();
+        const staffRowBuilder = appealHelper.createAppealStaffRow(targetGuildId, message.author.id, punishmentType);
+        const actionRow = componentsV2.createActionRow(staffRowBuilder.components.map(b => b.data || b));
 
-        const staffRow = appealHelper.createAppealStaffRow(targetGuildId, message.author.id, punishmentType);
-        await appealsChannel.send({ embeds: [appealEmbed], components: [staffRow] });
+        const appealContainer = componentsV2.createContainer({
+          accentColor: config.colors.warning,
+          components: [
+            componentsV2.createSection({
+              text: `# ⚖️ Punishment Appeal • ${punishmentType.toUpperCase()} (Via DM Reply)\n\n` +
+                `**👤 User**\n${message.author.tag} (${message.author})\n\`${message.author.id}\`\n\n` +
+                `**🔨 Punishment**\n\`${punishmentType.toUpperCase()}\`\n\n` +
+                `**🛡️ Punished By**\n${originalMod}\n\n` +
+                `**⚠️ Original Reason**\n${originalReason}\n\n` +
+                `**📝 Appeal Message**\n${message.content.slice(0, 1000) || '*[Attached media or empty]*'}\n\n` +
+                `**Status**\n⏳ **Pending Staff Review**\n\n` +
+                `*${config.footerText} • Click buttons below to resolve*`,
+              accessory: componentsV2.createThumbnail(message.author.displayAvatarURL({ dynamic: true }))
+            }),
+            actionRow
+          ]
+        });
 
-        const confirmDm = new EmbedBuilder()
-          .setColor(config.colors.success)
-          .setTitle('✅ Appeal Delivered to Staff')
-          .setDescription(`Your appeal for **${guild.name}** has been received and forwarded to the server staff in **#${appealsChannel.name}**.\n\nYou will be notified here via DM when a moderator reviews your appeal.`)
-          .setFooter({ text: config.footerText })
-          .setTimestamp();
+        await componentsV2.sendToChannel(client, appealsChannel.id, [appealContainer]);
 
-        await message.reply({ embeds: [confirmDm] });
+        const confirmContainer = componentsV2.createContainer({
+          accentColor: config.colors.success,
+          components: [
+            componentsV2.createSection({
+              text: `# ✅ Appeal Delivered to Staff\n\nYour appeal for **${guild.name}** has been received and forwarded to the server staff in **#${appealsChannel.name}**.\n\nYou will be notified here via DM when a moderator reviews your appeal.\n\n*${config.footerText}*`
+            })
+          ]
+        });
+
+        await componentsV2.sendToChannel(client, message.channel.id, [confirmContainer]);
         return;
       } catch (err) {
         console.error('Error handling DM appeal:', err);
@@ -106,6 +90,8 @@ module.exports = {
         });
       }
     }
+
+    if (!message.member) return;
 
     const channel = message.channel;
     const content = message.content.trim();
@@ -232,6 +218,228 @@ module.exports = {
       });
     }
 
+    // Check for ?invites command (?invites [@user])
+    if (content.toLowerCase().startsWith('?invites') || content.toLowerCase().startsWith('?invite')) {
+      const args = content.split(/\s+/).slice(1);
+      const target = message.mentions.users.first() || (args[0] ? await client.users.fetch(args[0].replace(/[<@!>]/g, '')).catch(() => null) : null) || message.author;
+      const db = require('../database/db');
+      const componentsV2 = require('../utils/componentsV2');
+
+      const stats = db.getMemberInvites(target.id, message.guild.id);
+      const joinInfo = db.getInviterOf(target.id, message.guild.id);
+
+      let inviterText = 'Direct / Vanity / Unknown';
+      if (joinInfo && joinInfo.inviter_id) {
+        if (joinInfo.inviter_id === 'VANITY_URL') {
+          inviterText = 'Server Vanity URL';
+        } else {
+          inviterText = `<@${joinInfo.inviter_id}>`;
+        }
+      }
+
+      const container = componentsV2.createContainer({
+        accentColor: config.colors.primary,
+        components: [
+          componentsV2.createSection({
+            text:
+              `# 💌 Invite Statistics for ${target.username}\n\n` +
+              `🏆 **Total Net Invites:** **${stats.total}**\n\n` +
+              `### 📊 Detailed Breakdown\n` +
+              `• ✅ **Regular (Active):** \`${stats.regular}\`\n` +
+              `• ⛔ **Left Server:** \`${stats.left}\`\n` +
+              `• 🤖 **Fake / Alts (<3d):** \`${stats.fake}\`\n` +
+              `• 🎁 **Bonus Invites:** \`${stats.bonus}\`\n\n` +
+              `📥 **Joined Via:** ${inviterText}\n` +
+              `*Net formula: Regular + Bonus - Left - Fake*`,
+            accessory: target.displayAvatarURL ? componentsV2.createThumbnail(target.displayAvatarURL({ dynamic: true })) : null
+          })
+        ]
+      });
+
+      await componentsV2.sendToChannel(client, channel.id, [container]);
+      return;
+    }
+
+    // Check for ?topinvites command
+    if (content.toLowerCase().startsWith('?topinvites') || content.toLowerCase().startsWith('?top-invites')) {
+      const db = require('../database/db');
+      const componentsV2 = require('../utils/componentsV2');
+      const topInviters = db.getTopInviters(message.guild.id, 10);
+
+      if (!topInviters || topInviters.length === 0) {
+        return message.reply({ content: 'ℹ️ No members have recorded invites yet on this server.' })
+          .then(msg => setTimeout(() => msg.delete().catch(() => {}), 5000));
+      }
+
+      const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+      let leaderboardText = `# 🏆 Top Inviters Leaderboard\n\n`;
+
+      for (let i = 0; i < topInviters.length; i++) {
+        const row = topInviters[i];
+        const medal = medals[i] || `${i + 1}.`;
+        const netTotal = Math.max(0, (row.regular || 0) + (row.bonus || 0) - (row.left || 0) - (row.fake || 0));
+        leaderboardText += `${medal} <@${row.user_id}> — **${netTotal} invites** *(✅ ${row.regular || 0} | ⛔ ${row.left || 0} | 🎁 ${row.bonus || 0})*\n`;
+      }
+
+      leaderboardText += `\n*Track your invites anytime using \`?invites\` or \`/invites\`!*`;
+
+      const container = componentsV2.createContainer({
+        accentColor: config.colors.primary,
+        components: [
+          componentsV2.createSection({
+            text: leaderboardText,
+            accessory: message.guild.iconURL ? componentsV2.createThumbnail(message.guild.iconURL({ dynamic: true })) : null
+          })
+        ]
+      });
+
+      await componentsV2.sendToChannel(client, channel.id, [container]);
+      return;
+    }
+
+    // Check for ?addinvites command (?addinvites @user <amount> [reason])
+    if (content.toLowerCase().startsWith('?addinvites') || content.toLowerCase().startsWith('?addinvite')) {
+      if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild) && !message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return message.reply({ content: '❌ You need **Manage Server** or **Administrator** permissions to adjust bonus invites.' })
+          .then(msg => setTimeout(() => msg.delete().catch(() => {}), 5000));
+      }
+
+      const args = content.split(/\s+/).slice(1);
+      const target = message.mentions.users.first() || (args[0] ? await client.users.fetch(args[0].replace(/[<@!>]/g, '')).catch(() => null) : null);
+
+      if (!target) {
+        return message.reply({ content: '⚠️ **Usage:** `?addinvites @user <amount> [reason]`' })
+          .then(msg => setTimeout(() => msg.delete().catch(() => {}), 6000));
+      }
+
+      const rawAmount = args.find((a, i) => i > 0 && /^-?\d+$/.test(a)) || args[1];
+      const amount = parseInt(rawAmount, 10);
+
+      if (isNaN(amount) || amount === 0) {
+        return message.reply({ content: '❌ Please specify a valid non-zero amount: `?addinvites @user 5`' })
+          .then(msg => setTimeout(() => msg.delete().catch(() => {}), 6000));
+      }
+
+      const db = require('../database/db');
+      const componentsV2 = require('../utils/componentsV2');
+      const reason = args.slice(2).join(' ') || 'Manual staff adjustment';
+
+      const updated = db.addBonusInvites(target.id, message.guild.id, amount);
+
+      const container = componentsV2.createContainer({
+        accentColor: config.colors.primary,
+        components: [
+          componentsV2.createSection({
+            text:
+              `# 🎁 Bonus Invites Adjusted\n\n` +
+              `**Member:** ${target} (\`${target.tag}\`)\n` +
+              `**Adjustment:** **${amount > 0 ? `+${amount}` : amount} Bonus Invites**\n` +
+              `**Updated Net Total:** **${updated.total} Invites** *(🎁 Total Bonus: ${updated.bonus})*\n` +
+              `**Reason:** *${reason}*\n\n` +
+              `*Adjusted by ${message.author}*`,
+            accessory: target.displayAvatarURL ? componentsV2.createThumbnail(target.displayAvatarURL({ dynamic: true })) : null
+          })
+        ]
+      });
+
+      await componentsV2.sendToChannel(client, channel.id, [container]);
+      return;
+    }
+
+    // Check for ?topspotters command
+    if (content.toLowerCase().startsWith('?topspotters') || content.toLowerCase().startsWith('?top-spotters')) {
+      const db = require('../database/db');
+      const levelHelper = require('../utils/levelHelper');
+      const componentsV2 = require('../utils/componentsV2');
+      const topUsers = db.getTopUsersByXP(message.guild.id, 10);
+
+      if (!topUsers || topUsers.length === 0) {
+        return message.reply({ content: 'ℹ️ No members have earned Spotter XP yet.' })
+          .then(msg => setTimeout(() => msg.delete().catch(() => {}), 5000));
+      }
+
+      const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+      let listText = `# 🌟 Top Community Spotters & Aviators\n\n`;
+
+      for (let i = 0; i < topUsers.length; i++) {
+        const u = topUsers[i];
+        const medal = medals[i] || `${i + 1}.`;
+        const rankTitle = levelHelper.getRankTitle(u.level);
+        listText += `${medal} <@${u.user_id}> — **Level ${u.level}** (*${rankTitle}*)\n   └ ✨ **${u.xp.toLocaleString()} XP**\n\n`;
+      }
+
+      listText += `*Type \`/rank\` to check your personal spotter stats!*`;
+
+      const container = componentsV2.createContainer({
+        accentColor: config.colors.primary,
+        components: [
+          componentsV2.createSection({
+            text: listText,
+            accessory: message.guild.iconURL ? componentsV2.createThumbnail(message.guild.iconURL({ dynamic: true })) : null
+          })
+        ]
+      });
+
+      await componentsV2.sendToChannel(client, channel.id, [container]);
+      return;
+    }
+
+    // Check for ?topchatters command
+    if (content.toLowerCase().startsWith('?topchatters') || content.toLowerCase().startsWith('?top-chatters')) {
+      const db = require('../database/db');
+      const levelHelper = require('../utils/levelHelper');
+      const componentsV2 = require('../utils/componentsV2');
+      const topUsers = db.getTopUsersByChatXP(message.guild.id, 10);
+
+      if (!topUsers || topUsers.length === 0) {
+        return message.reply({ content: 'ℹ️ No chat activity data recorded yet.' })
+          .then(msg => setTimeout(() => msg.delete().catch(() => {}), 5000));
+      }
+
+      const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+      let listText = `# 💬 Top Active Chatters — ${message.guild.name}\n\n`;
+
+      for (let i = 0; i < topUsers.length; i++) {
+        const u = topUsers[i];
+        const medal = medals[i] || `${i + 1}.`;
+        const levelData = levelHelper.calculateChatLevelData(u.chat_xp || 0);
+        listText += `${medal} <@${u.user_id}> — **Level ${levelData.level}** (*${levelData.rankTitle}*)\n   └ ✨ **${(u.chat_xp || 0).toLocaleString()}** Chat XP • 💬 **${(u.messages_count || 0).toLocaleString()}** messages\n\n`;
+      }
+
+      listText += `*Chat activity awards 15–25 XP per minute in text channels.*`;
+
+      const container = componentsV2.createContainer({
+        accentColor: config.colors.primary,
+        components: [
+          componentsV2.createSection({
+            text: listText,
+            accessory: message.guild.iconURL ? componentsV2.createThumbnail(message.guild.iconURL({ dynamic: true })) : null
+          })
+        ]
+      });
+
+      await componentsV2.sendToChannel(client, channel.id, [container]);
+      return;
+    }
+
+    // Check for ?postleaderboard command
+    if (content.toLowerCase().startsWith('?postleaderboard') || content.toLowerCase().startsWith('?post-leaderboard')) {
+      if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return message.reply({ content: '❌ You need **Administrator** permissions to post leaderboards.' })
+          .then(msg => setTimeout(() => msg.delete().catch(() => {}), 5000));
+      }
+
+      const args = content.split(/\s+/).slice(1);
+      const period = args[0]?.toLowerCase() || 'daily';
+      const validPeriod = ['daily', 'three_days', 'weekly', 'monthly', 'yearly'].includes(period) ? period : 'daily';
+
+      const leaderboardService = require('../services/leaderboardService');
+      await leaderboardService.postLeaderboard(message.guild, validPeriod, true);
+
+      return message.reply({ content: `✅ Successfully published **${validPeriod}** photo leaderboard to the leaderboard channel!` })
+        .then(msg => setTimeout(() => msg.delete().catch(() => {}), 6000));
+    }
+
     // ----------------------------------------------------
     // Photo Submission & Rating System
     // Submissions are posted in #📤ㆍphoto-submit (15m slowmode)
@@ -299,7 +507,7 @@ module.exports = {
 
         if (!isAviation) {
           console.log(`🚫 [Gemini Filter] Image by ${message.author.tag} in #${channel.name} was rejected as non-aviation.`);
-          await message.reactions.removeAll().catch(() => {});
+          await message.reactions.resolve('⏳')?.users.remove(client.user.id).catch(() => {});
           await message.react('❌').catch(() => {});
 
           const rejMsg = await channel.send({
@@ -313,7 +521,7 @@ module.exports = {
         }
 
         // Gemini approved: Mark with green checkmark
-        await message.reactions.removeAll().catch(() => {});
+        await message.reactions.resolve('⏳')?.users.remove(client.user.id).catch(() => {});
         await message.react('✅').catch(() => {});
 
         // Find #pic-rating channel
@@ -421,17 +629,16 @@ module.exports = {
         // Delete user's ?stick trigger message
         await message.delete().catch(() => {});
 
-        const promptEmbed = new EmbedBuilder()
-          .setColor(config.colors.warning)
-          .setTitle('🔒 Channel Locked • Sticky Message Setup')
-          .setDescription(
-            `Hello ${message.author}! This channel has been temporarily locked so you can set up a sticky message.\n\n` +
-            '**Please type the message you would like to stick below.**\n' +
-            '*(Type `cancel` within 2 minutes to abort and unlock the channel)*'
-          )
-          .setFooter({ text: config.footerText });
+        const promptContainer = componentsV2.createContainer({
+          accentColor: config.colors.warning,
+          components: [
+            componentsV2.createSection({
+              text: `# 🔒 Channel Locked • Sticky Message Setup\n\nHello ${message.author}! This channel has been temporarily locked so you can set up a sticky message.\n\n**Please type the message you would like to stick below.**\n*(Type \`cancel\` within 2 minutes to abort and unlock the channel)*\n\n*${config.footerText}*`
+            })
+          ]
+        });
 
-        const promptMsg = await channel.send({ embeds: [promptEmbed] });
+        const promptMsg = await componentsV2.sendToChannel(client, channel.id, [promptContainer]);
 
         // Await next message from author
         const filter = m => m.author.id === message.author.id;
@@ -562,18 +769,16 @@ module.exports = {
         }, { reason: `Chat closed by ${message.author.tag}` });
       }
 
-      const stopEmbed = new EmbedBuilder()
-        .setColor(config.colors.error)
-        .setTitle('🔒 Chat Closed')
-        .setDescription(
-          `Chat access has been disabled by ${message.author}.\n` +
-          `The quarantined user can no longer send messages in this channel.\n\n` +
-          `*Click **Chat Activate** above to reopen communication if needed.*`
-        )
-        .setFooter({ text: config.footerText })
-        .setTimestamp();
+      const stopContainer = componentsV2.createContainer({
+        accentColor: config.colors.error,
+        components: [
+          componentsV2.createSection({
+            text: `# 🔒 Chat Closed\n\nChat access has been disabled by ${message.author}.\nThe quarantined user can no longer send messages in this channel.\n\n*Click **Chat Activate** above to reopen communication if needed.*\n\n*${config.footerText}*`
+          })
+        ]
+      });
 
-      return channel.send({ embeds: [stopEmbed] });
+      return componentsV2.sendToChannel(client, channel.id, [stopContainer]);
     }
 
     // ----------------------------------------------------
@@ -601,20 +806,17 @@ module.exports = {
         const xpResult = db.addChatXP(message.author.id, message.guild.id, xpGained);
 
         if (xpResult && xpResult.leveledUp) {
-          const levelUpEmbed = new EmbedBuilder()
-            .setColor(config.colors.primary)
-            .setAuthor({
-              name: `Level Up! 🎉`,
-              iconURL: message.author.displayAvatarURL({ dynamic: true })
-            })
-            .setDescription(
-              `Congratulations ${message.author}! You have reached **Chat Activity Level ${xpResult.newLevel}**!\n\n` +
-              `🎖️ **Title:** **${xpResult.levelData.rankTitle}**\n` +
-              `📊 **Progress:** \`${xpResult.levelData.progressBar}\``
-            )
-            .setFooter({ text: `${config.footerText} • Community Leveling` });
+          const levelUpContainer = componentsV2.createContainer({
+            accentColor: config.colors.primary,
+            components: [
+              componentsV2.createSection({
+                text: `**Level Up! 🎉**\n\nCongratulations ${message.author}! You have reached **Chat Activity Level ${xpResult.newLevel}**!\n\n🎖️ **Title:** **${xpResult.levelData.rankTitle}**\n📊 **Progress:** \`${xpResult.levelData.progressBar}\`\n\n*${config.footerText} • Community Leveling*`,
+                accessory: componentsV2.createThumbnail(message.author.displayAvatarURL({ dynamic: true }))
+              })
+            ]
+          });
 
-          channel.send({ embeds: [levelUpEmbed] }).catch(() => {});
+          componentsV2.sendToChannel(client, channel.id, [levelUpContainer]).catch(() => {});
         }
       }
     }

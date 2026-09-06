@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const leaderboardService = require('../../services/leaderboardService');
 const config = require('../../config');
 
@@ -30,13 +31,15 @@ module.exports = {
       const result = await leaderboardService.postLeaderboard(interaction.guild, period, true);
       const conf = leaderboardService.PERIOD_CONFIG[period];
 
-      const successEmbed = new EmbedBuilder()
-        .setColor(config.colors.success)
-        .setTitle(`${config.emojis.success} Leaderboard Posted`)
-        .setDescription(`Successfully posted the **${conf.name}** in ${result.channel}!`)
-        .setFooter({ text: config.footerText });
+      const mdText = `# ${config.emojis.success} Leaderboard Posted\n\nSuccessfully posted the **${conf.name}** in ${result.channel}!\n\n*${config.footerText}*`;
+      const container = componentsV2.createContainer({
+        accentColor: config.colors.success,
+        components: [
+          componentsV2.createSection({ text: mdText })
+        ]
+      });
 
-      return interaction.editReply({ embeds: [successEmbed] });
+      return componentsV2.editInteractionReply(interaction, [container]);
     } catch (err) {
       console.error('Error posting manual leaderboard:', err);
       return interaction.editReply({

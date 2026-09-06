@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const db = require('../../database/db');
 const adminLogService = require('../../services/adminLogService');
 const config = require('../../config');
@@ -37,36 +38,34 @@ module.exports = {
 
     db.setAllowedInvites(targetUser.id, guild.id, amount, interaction.user.tag, reason);
 
-    const embed = new EmbedBuilder()
-      .setColor(amount > 0 ? config.colors.success : config.colors.warning)
-      .setTitle('🔗 Discord Invite Allowance Updated')
-      .setDescription(
-        amount > 0
-          ? `✅ **${targetUser}** (\`${targetUser.tag}\`) has been granted **${amount}** allowed Discord invite link(s).\n\n` +
-            `📝 **Reason / Note:** *${reason}*\n` +
-            `🛡️ *The Anti-Spam filter will automatically allow the next ${amount} invite(s) posted by this user.*`
-          : `🛑 Invite permissions for **${targetUser}** have been **revoked** (Quota: 0).`
-      )
-      .setFooter({ text: `${config.footerText} • Sponsored Ad Management` })
-      .setTimestamp();
+    const desc = amount > 0
+      ? `✅ **${targetUser}** (\`${targetUser.tag}\`) has been granted **${amount}** allowed Discord invite link(s).\n\n📝 **Reason / Note:** *${reason}*\n🛡️ *The Anti-Spam filter will automatically allow the next ${amount} invite(s) posted by this user.*`
+      : `🛑 Invite permissions for **${targetUser}** have been **revoked** (Quota: 0).`;
 
-    await interaction.reply({ embeds: [embed] });
+    const container = componentsV2.createContainer({
+      accentColor: amount > 0 ? config.colors.success : config.colors.warning,
+      components: [
+        componentsV2.createSection({
+          text: `# 🔗 Discord Invite Allowance Updated\n\n${desc}\n\n*${config.footerText} • Sponsored Ad Management*`
+        })
+      ]
+    });
+
+    componentsV2.replyToInteraction(interaction, [container]);
 
     // Log to Admin Logs
     const adminChannel = await adminLogService.getOrCreateAdminLogChannel(guild);
     if (adminChannel) {
-      const logEmbed = new EmbedBuilder()
-        .setColor(amount > 0 ? 0x2ECC71 : 0xE67E22)
-        .setTitle('🔗 Invite Quota Modified')
-        .setDescription(
-          `**User:** ${targetUser} (\`${targetUser.id}\`)\n` +
-          `**New Quota:** ${amount} invite(s)\n` +
-          `**Moderator:** ${interaction.user} (\`${interaction.user.tag}\`)\n` +
-          `**Reason:** ${reason}`
-        )
-        .setTimestamp();
+      const logContainer = componentsV2.createContainer({
+        accentColor: amount > 0 ? 0x2ECC71 : 0xE67E22,
+        components: [
+          componentsV2.createSection({
+            text: `# 🔗 Invite Quota Modified\n\n**User:** ${targetUser} (\`${targetUser.id}\`)\n**New Quota:** ${amount} invite(s)\n**Moderator:** ${interaction.user} (\`${interaction.user.tag}\`)\n**Reason:** ${reason}`
+          })
+        ]
+      });
 
-      await adminChannel.send({ embeds: [logEmbed] }).catch(() => {});
+      componentsV2.sendToChannel(interaction.client, adminChannel.id, [logContainer]);
     }
   }
 };

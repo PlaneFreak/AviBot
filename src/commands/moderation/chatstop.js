@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const config = require('../../config');
 
 module.exports = {
@@ -24,23 +25,28 @@ module.exports = {
     );
 
     if (memberOverwrite) {
-      await channel.permissionOverwrites.edit(memberOverwrite.id, {
-        SendMessages: false,
-        AddReactions: false
-      }, { reason: `Chat closed by ${interaction.user.tag}` });
+      try {
+        await channel.permissionOverwrites.edit(memberOverwrite.id, {
+          SendMessages: false,
+          AddReactions: false
+        }, { reason: `Chat closed by ${interaction.user.tag}` });
+      } catch (err) {
+        return interaction.reply({
+          content: `❌ Failed to update channel permissions: ${err.message}`,
+          ephemeral: true
+        });
+      }
     }
 
-    const stopEmbed = new EmbedBuilder()
-      .setColor(config.colors.error)
-      .setTitle('🔒 Chat Closed')
-      .setDescription(
-        `Chat access has been disabled by ${interaction.user}.\n` +
-        `The quarantined user can no longer send messages in this channel.\n\n` +
-        `*Click **Chat Activate** above to reopen communication if needed.*`
-      )
-      .setFooter({ text: config.footerText })
-      .setTimestamp();
+    const container = componentsV2.createContainer({
+      accentColor: config.colors.error,
+      components: [
+        componentsV2.createSection({
+          text: `# 🔒 Chat Closed\n\nChat access has been disabled by ${interaction.user}.\nThe quarantined user can no longer send messages in this channel.\n\n*Click **Chat Activate** above to reopen communication if needed.*\n\n*${config.footerText}*`
+        })
+      ]
+    });
 
-    await interaction.reply({ embeds: [stopEmbed] });
+    await componentsV2.replyToInteraction(interaction, [container]);
   }
 };

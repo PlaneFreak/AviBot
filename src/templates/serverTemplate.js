@@ -16,6 +16,7 @@ module.exports = {
     },
     channels: {
       news: '1524792111860285683',
+      instagram: null,
       rules: '1524792139702337669',
       welcome: '1525420784103723079',
       roles: '1525420839116472340',
@@ -175,6 +176,12 @@ module.exports = {
           name: '📰ㆍnews',
           type: ChannelType.GuildText,
           topic: 'Official aviation news, server announcements, and community updates.',
+          readOnly: true
+        },
+        {
+          name: '📸ㆍinstagram',
+          type: ChannelType.GuildText,
+          topic: 'Official Instagram posts, aviation photography highlights, and social updates.',
           readOnly: true
         },
         {

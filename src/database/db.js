@@ -109,6 +109,48 @@ function initDB() {
         updated_at INTEGER DEFAULT (strftime('%s', 'now')),
         PRIMARY KEY(user_id, guild_id)
       );
+
+      CREATE TABLE IF NOT EXISTS member_invites (
+        user_id TEXT NOT NULL,
+        guild_id TEXT NOT NULL,
+        regular INTEGER DEFAULT 0,
+        fake INTEGER DEFAULT 0,
+        left INTEGER DEFAULT 0,
+        bonus INTEGER DEFAULT 0,
+        PRIMARY KEY(user_id, guild_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS member_join_history (
+        user_id TEXT NOT NULL,
+        guild_id TEXT NOT NULL,
+        inviter_id TEXT,
+        invite_code TEXT,
+        is_fake INTEGER DEFAULT 0,
+        joined_at INTEGER DEFAULT (strftime('%s', 'now')),
+        PRIMARY KEY(user_id, guild_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS instagram_posts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        post_id TEXT UNIQUE NOT NULL,
+        post_url TEXT NOT NULL,
+        caption TEXT,
+        image_url TEXT,
+        guild_id TEXT,
+        created_at INTEGER DEFAULT (strftime('%s', 'now'))
+      );
+    `);
+
+    // Performance indexes
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_punishments_status_expires ON punishments(status, expires_at);
+      CREATE INDEX IF NOT EXISTS idx_punishments_guild_user ON punishments(guild_id, user_id);
+      CREATE INDEX IF NOT EXISTS idx_user_profiles_guild_xp ON user_profiles(guild_id, xp DESC);
+      CREATE INDEX IF NOT EXISTS idx_user_profiles_guild_chat_xp ON user_profiles(guild_id, chat_xp DESC);
+      CREATE INDEX IF NOT EXISTS idx_photo_submissions_guild_points ON photo_submissions(guild_id, total_points DESC);
+      CREATE INDEX IF NOT EXISTS idx_photo_votes_submission ON photo_votes(submission_id);
+      CREATE INDEX IF NOT EXISTS idx_member_invites_guild ON member_invites(guild_id);
+      CREATE INDEX IF NOT EXISTS idx_instagram_posts_id ON instagram_posts(post_id);
     `);
 
     // Auto-migrations for existing tables
@@ -246,6 +288,17 @@ module.exports = {
       LIMIT ?
     `);
     return stmt.all(guildId, sinceSecondsTimestamp, limit);
+  },
+
+  getAllTopPhotos(guildId, limit = 10) {
+    if (!db) initDB();
+    const stmt = db.prepare(`
+      SELECT * FROM photo_submissions
+      WHERE guild_id = ?
+      ORDER BY total_points DESC, total_rating_sum DESC, vote_count DESC
+      LIMIT ?
+    `);
+    return stmt.all(guildId, limit);
   },
 
   getLastLeaderboardRun(key, guildId) {
@@ -561,6 +614,142 @@ module.exports = {
     } catch (err) {
       console.error('Error getting honeypot count:', err);
       return 0;
+    }
+  },
+
+  // --- Invite Counter System Methods ---
+
+  getMemberInvites(userId, guildId) {
+    if (!db) initDB();
+    const stmt = db.prepare(`SELECT * FROM member_invites WHERE user_id = ? AND guild_id = ?`);
+    const row = stmt.get(userId, guildId);
+    if (!row) {
+      return { regular: 0, fake: 0, left: 0, bonus: 0, total: 0 };
+    }
+    const total = (row.regular || 0) + (row.bonus || 0) - (row.left || 0) - (row.fake || 0);
+    return {
+      regular: row.regular || 0,
+      fake: row.fake || 0,
+      left: row.left || 0,
+      bonus: row.bonus || 0,
+      total: Math.max(0, total)
+    };
+  },
+
+  recordMemberJoin(userId, guildId, inviterId, inviteCode, isFake = false) {
+    if (!db) initDB();
+
+    // 1. Record in join history
+    const joinStmt = db.prepare(`
+      INSERT INTO member_join_history (user_id, guild_id, inviter_id, invite_code, is_fake, joined_at)
+      VALUES (?, ?, ?, ?, ?, strftime('%s', 'now'))
+      ON CONFLICT(user_id, guild_id) DO UPDATE SET
+        inviter_id = excluded.inviter_id,
+        invite_code = excluded.invite_code,
+        is_fake = excluded.is_fake,
+        joined_at = strftime('%s', 'now')
+    `);
+    joinStmt.run(userId, guildId, inviterId, inviteCode, isFake ? 1 : 0);
+
+    // 2. Increment inviter count if inviter exists
+    if (inviterId) {
+      const column = isFake ? 'fake' : 'regular';
+      const invStmt = db.prepare(`
+        INSERT INTO member_invites (user_id, guild_id, regular, fake, left, bonus)
+        VALUES (?, ?, ${isFake ? 0 : 1}, ${isFake ? 1 : 0}, 0, 0)
+        ON CONFLICT(user_id, guild_id) DO UPDATE SET
+          ${column} = ${column} + 1
+      `);
+      invStmt.run(inviterId, guildId);
+    }
+  },
+
+  recordMemberLeave(userId, guildId) {
+    if (!db) initDB();
+    const historyStmt = db.prepare(`SELECT inviter_id, is_fake FROM member_join_history WHERE user_id = ? AND guild_id = ?`);
+    const history = historyStmt.get(userId, guildId);
+
+    if (history && history.inviter_id) {
+      const updateStmt = db.prepare(`
+        INSERT INTO member_invites (user_id, guild_id, regular, fake, left, bonus)
+        VALUES (?, ?, 0, 0, 1, 0)
+        ON CONFLICT(user_id, guild_id) DO UPDATE SET
+          left = left + 1
+      `);
+      updateStmt.run(history.inviter_id, guildId);
+      return history.inviter_id;
+    }
+    return null;
+  },
+
+  addBonusInvites(userId, guildId, amount) {
+    if (!db) initDB();
+    const stmt = db.prepare(`
+      INSERT INTO member_invites (user_id, guild_id, regular, fake, left, bonus)
+      VALUES (?, ?, 0, 0, 0, ?)
+      ON CONFLICT(user_id, guild_id) DO UPDATE SET
+        bonus = bonus + ?
+    `);
+    stmt.run(userId, guildId, amount, amount);
+    return this.getMemberInvites(userId, guildId);
+  },
+
+  clearMemberInvites(userId, guildId) {
+    if (!db) initDB();
+    const stmt = db.prepare(`
+      INSERT INTO member_invites (user_id, guild_id, regular, fake, left, bonus)
+      VALUES (?, ?, 0, 0, 0, 0)
+      ON CONFLICT(user_id, guild_id) DO UPDATE SET
+        regular = 0, fake = 0, left = 0, bonus = 0
+    `);
+    stmt.run(userId, guildId);
+    return { regular: 0, fake: 0, left: 0, bonus: 0, total: 0 };
+  },
+
+  getTopInviters(guildId, limit = 10) {
+    if (!db) initDB();
+    const stmt = db.prepare(`
+      SELECT *, (regular + bonus - left - fake) AS total
+      FROM member_invites
+      WHERE guild_id = ? AND (regular + bonus) > 0
+      ORDER BY total DESC, regular DESC
+      LIMIT ?
+    `);
+    return stmt.all(guildId, limit);
+  },
+
+  getInviterOf(userId, guildId) {
+    if (!db) initDB();
+    const stmt = db.prepare(`SELECT * FROM member_join_history WHERE user_id = ? AND guild_id = ?`);
+    return stmt.get(userId, guildId) || null;
+  },
+
+  isInstagramPostRecorded(postId) {
+    if (!db) initDB();
+    const stmt = db.prepare(`SELECT id FROM instagram_posts WHERE post_id = ? LIMIT 1`);
+    return !!stmt.get(postId);
+  },
+
+  recordInstagramPost({ postId, postUrl, caption = '', imageUrl = '', guildId = null }) {
+    if (!db) initDB();
+    const stmt = db.prepare(`
+      INSERT OR IGNORE INTO instagram_posts (post_id, post_url, caption, image_url, guild_id)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    const info = stmt.run(postId, postUrl, caption, imageUrl, guildId);
+    return info.changes > 0;
+  },
+
+  getRecentInstagramPosts(limit = 10) {
+    if (!db) initDB();
+    const stmt = db.prepare(`SELECT * FROM instagram_posts ORDER BY created_at DESC LIMIT ?`);
+    return stmt.all(limit);
+  },
+
+  closeDB() {
+    if (db) {
+      db.close();
+      console.log('🔒 SQLite database connection closed.');
     }
   }
 };

@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const db = require('../../database/db');
 const config = require('../../config');
 
@@ -21,58 +22,39 @@ module.exports = {
     const profile = db.getJetPhotosProfile(targetUser.id, guild.id);
 
     if (!profile || !profile.jp_verified) {
-      const notVerifiedEmbed = new EmbedBuilder()
-        .setColor(config.colors.warning)
-        .setTitle('✈️ JetPhotos Status')
-        .setDescription(
-          `${targetUser} has not verified a personal JetPhotos account yet.\n\n` +
-          `**Want to link your account?**\n` +
-          `Use \`/jetphotos-verify\` with a screenshot of your personal dashboard to unlock your role!`
-        )
-        .setFooter({ text: config.footerText });
+      const mdText = `# ✈️ JetPhotos Status\n\n${targetUser} has not verified a personal JetPhotos account yet.\n\n**Want to link your account?**\nUse \`/jetphotos-verify\` with a screenshot of your personal dashboard to unlock your role!\n\n*${config.footerText}*`;
+      
+      const container = componentsV2.createContainer({
+        accentColor: config.colors.warning,
+        components: [
+          componentsV2.createSection({ text: mdText })
+        ]
+      });
 
-      return interaction.reply({ embeds: [notVerifiedEmbed] });
+      return componentsV2.replyToInteraction(interaction, [container]);
     }
 
     const isPro = profile.jp_photo_count >= 150;
+    
+    let mdText = `**${targetUser.tag}’s JetPhotos Profile**\n\n`;
+    mdText += `**👤 Photographer Name**\n\`${profile.jp_username || 'Verified User'}\`\n\n`;
+    mdText += `**📸 Accepted Photos**\n**${profile.jp_photo_count}** photos\n\n`;
+    mdText += `**📊 Acceptance Rate**\n**${profile.jp_acceptance_rate || 'Verified'}**\n\n`;
+    mdText += `**🎖️ Current Tier**\n${isPro ? '🏆 **JetPhotos PRO Spotter (150+)**' : '✈️ **JetPhotos Spotter**'}\n\n`;
+    mdText += `**🗓️ Verified Since**\n${profile.jp_verified_at ? `<t:${profile.jp_verified_at}:D>` : 'Recently'}\n\n`;
+    
+    mdText += `*${config.footerText} • Authenticated via Gemini AI Vision* <t:${Math.floor(Date.now() / 1000)}:R>`;
 
-    const embed = new EmbedBuilder()
-      .setColor(isPro ? 0xF1C40F : 0x3498DB)
-      .setAuthor({
-        name: `${targetUser.tag}’s JetPhotos Profile`,
-        iconURL: targetUser.displayAvatarURL({ dynamic: true })
-      })
-      .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 256 }))
-      .addFields(
-        {
-          name: '👤 Photographer Name',
-          value: `\`${profile.jp_username || 'Verified User'}\``,
-          inline: true
-        },
-        {
-          name: '📸 Accepted Photos',
-          value: `**${profile.jp_photo_count}** photos`,
-          inline: true
-        },
-        {
-          name: '📊 Acceptance Rate',
-          value: `**${profile.jp_acceptance_rate || 'Verified'}**`,
-          inline: true
-        },
-        {
-          name: '🎖️ Current Tier',
-          value: isPro ? '🏆 **JetPhotos PRO Spotter (150+)**' : '✈️ **JetPhotos Spotter**',
-          inline: false
-        },
-        {
-          name: '🗓️ Verified Since',
-          value: profile.jp_verified_at ? `<t:${profile.jp_verified_at}:D>` : 'Recently',
-          inline: true
-        }
-      )
-      .setFooter({ text: `${config.footerText} • Authenticated via Gemini AI Vision` })
-      .setTimestamp();
+    const container = componentsV2.createContainer({
+      accentColor: isPro ? 0xF1C40F : 0x3498DB,
+      components: [
+        componentsV2.createSection({
+          text: mdText,
+          accessory: componentsV2.createThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 256 }))
+        })
+      ]
+    });
 
-    return interaction.reply({ embeds: [embed] });
+    return componentsV2.replyToInteraction(interaction, [container]);
   }
 };

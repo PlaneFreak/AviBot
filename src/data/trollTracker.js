@@ -28,6 +28,9 @@ module.exports = {
   addTroll(userId, durationMs = 10 * 60 * 1000) {
     const expiresAt = Date.now() + durationMs;
     activeTrolls.set(userId, { expiresAt, lastCommentIndex: -1 });
+    setTimeout(() => {
+      activeTrolls.delete(userId);
+    }, durationMs);
     return expiresAt;
   },
 

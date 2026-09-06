@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const config = require('../../config');
 
 module.exports = {
@@ -59,17 +60,16 @@ module.exports = {
       }
 
       // Try sending a DM notification to the user before softbanning
-      const dmEmbed = new EmbedBuilder()
-        .setColor(config.colors.warning)
-        .setTitle(`🔨 You have been softbanned from ${interaction.guild.name}`)
-        .setDescription('You have been kicked and your recent messages were cleared. You may rejoin using an invite.')
-        .addFields(
-          { name: 'Reason', value: reason },
-          { name: 'Moderator', value: interaction.user.tag }
-        )
-        .setTimestamp();
+      const dmContainer = componentsV2.createContainer({
+        accentColor: config.colors.warning,
+        components: [
+          componentsV2.createSection({
+            text: `# 🔨 You have been softbanned from ${interaction.guild.name}\n\nYou have been kicked and your recent messages were cleared. You may rejoin using an invite.\n\n**Reason**\n${reason}\n\n**Moderator**\n${interaction.user.tag}`
+          })
+        ]
+      });
 
-      await member.send({ embeds: [dmEmbed] }).catch(() => {});
+      await componentsV2.sendDM(interaction.client, member.id, [dmContainer]).catch(() => {});
     }
 
     await interaction.deferReply();
@@ -84,20 +84,17 @@ module.exports = {
       // 2. Immediately unban to complete softban
       await interaction.guild.members.unban(targetUser.id, `Softban unban by ${interaction.user.tag}`);
 
-      const softbanEmbed = new EmbedBuilder()
-        .setColor(config.colors.warning)
-        .setTitle(`${config.emojis.shield} Member Softbanned`)
-        .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-        .addFields(
-          { name: 'User', value: `${targetUser.tag} (\`${targetUser.id}\`)`, inline: true },
-          { name: 'Moderator', value: `${interaction.user.tag}`, inline: true },
-          { name: 'Purged Message History', value: `${deleteDays} day(s)`, inline: true },
-          { name: 'Reason', value: reason }
-        )
-        .setFooter({ text: `${config.footerText} • Kicked & Messages Cleared` })
-        .setTimestamp();
+      const softbanContainer = componentsV2.createContainer({
+        accentColor: config.colors.warning,
+        components: [
+          componentsV2.createSection({
+            text: `# ${config.emojis.shield} Member Softbanned\n\n**User**\n${targetUser.tag} (\`${targetUser.id}\`)\n\n**Moderator**\n${interaction.user.tag}\n\n**Purged Message History**\n${deleteDays} day(s)\n\n**Reason**\n${reason}\n\n*${config.footerText} • Kicked & Messages Cleared*`,
+            accessory: componentsV2.createThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
+          })
+        ]
+      });
 
-      await interaction.editReply({ embeds: [softbanEmbed] });
+      await componentsV2.editInteractionReply(interaction, [softbanContainer]);
     } catch (error) {
       console.error('Error during softban:', error);
       return interaction.editReply({

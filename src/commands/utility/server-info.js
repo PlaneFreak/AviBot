@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder, ChannelType, GuildVerificationLevel } = require('discord.js');
+const { SlashCommandBuilder, ChannelType, GuildVerificationLevel } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const config = require('../../config');
 
 module.exports = {
@@ -42,56 +43,49 @@ module.exports = {
       4: 'Highest (Verified Phone)'
     };
 
-    const embed = new EmbedBuilder()
-      .setColor(config.colors.primary)
-      .setTitle(`ℹ️ ${guild.name} • Server Information`)
-      .setThumbnail(guild.iconURL({ dynamic: true, size: 512 }))
-      .addFields(
-        {
-          name: '👑 Ownership & Basics',
-          value: [
-            `• **Server ID:** \`${guild.id}\``,
-            `• **Owner:** ${owner ? `${owner.user.tag} (\`${owner.id}\`)` : 'Unknown'}`,
-            `• **Created:** <t:${createdTimestamp}:F> (<t:${createdTimestamp}:R>)`,
-            `• **Verification:** \`${verificationLevels[guild.verificationLevel] || 'Unknown'}\``
-          ].join('\n'),
-          inline: false
-        },
-        {
-          name: `👥 Members (${totalMembers})`,
-          value: [
-            `• **Humans:** \`${humanCount}\``,
-            `• **Bots:** \`${botCount}\``
-          ].join('\n'),
-          inline: true
-        },
-        {
-          name: `📁 Channels (${channels.size})`,
-          value: [
-            `• **Text:** \`${textChannels}\``,
-            `• **Voice:** \`${voiceChannels}\``,
-            `• **Categories:** \`${categoryCount}\``
-          ].join('\n'),
-          inline: true
-        },
-        {
-          name: '🚀 Nitro & Customization',
-          value: [
-            `• **Boost Level:** \`Tier ${boostLevel}\``,
-            `• **Boosts:** \`${boostCount}\` boosts`,
-            `• **Roles:** \`${rolesCount}\``,
-            `• **Emojis & Stickers:** \`${emojisCount}\` / \`${stickersCount}\``
-          ].join('\n'),
-          inline: true
-        }
-      )
-      .setFooter({ text: config.footerText })
-      .setTimestamp();
+    let mdText = `# ℹ️ ${guild.name} • Server Information\n\n`;
+    
+    mdText += `**👑 Ownership & Basics**\n`;
+    mdText += `• **Server ID:** \`${guild.id}\`\n`;
+    mdText += `• **Owner:** ${owner ? `${owner.user.tag} (\`${owner.id}\`)` : 'Unknown'}\n`;
+    mdText += `• **Created:** <t:${createdTimestamp}:F> (<t:${createdTimestamp}:R>)\n`;
+    mdText += `• **Verification:** \`${verificationLevels[guild.verificationLevel] || 'Unknown'}\`\n\n`;
+    
+    mdText += `**👥 Members (${totalMembers})**\n`;
+    mdText += `• **Humans:** \`${humanCount}\`\n`;
+    mdText += `• **Bots:** \`${botCount}\`\n\n`;
+    
+    mdText += `**📁 Channels (${channels.size})**\n`;
+    mdText += `• **Text:** \`${textChannels}\`\n`;
+    mdText += `• **Voice:** \`${voiceChannels}\`\n`;
+    mdText += `• **Categories:** \`${categoryCount}\`\n\n`;
+    
+    mdText += `**🚀 Nitro & Customization**\n`;
+    mdText += `• **Boost Level:** \`Tier ${boostLevel}\`\n`;
+    mdText += `• **Boosts:** \`${boostCount}\` boosts\n`;
+    mdText += `• **Roles:** \`${rolesCount}\`\n`;
+    mdText += `• **Emojis & Stickers:** \`${emojisCount}\` / \`${stickersCount}\`\n\n`;
+    
+    mdText += `*${config.footerText}* <t:${Math.floor(Date.now() / 1000)}:R>`;
 
+    const components = [];
+    
     if (guild.bannerURL()) {
-      embed.setImage(guild.bannerURL({ size: 1024 }));
+      components.push(componentsV2.createMediaGallery([guild.bannerURL({ size: 1024 })]));
     }
+    
+    components.push(
+      componentsV2.createSection({
+        text: mdText,
+        accessory: componentsV2.createThumbnail(guild.iconURL({ dynamic: true, size: 512 }))
+      })
+    );
 
-    await interaction.editReply({ embeds: [embed] });
+    const container = componentsV2.createContainer({
+      accentColor: config.colors.primary,
+      components: components
+    });
+
+    await componentsV2.editInteractionReply(interaction, [container]);
   }
 };

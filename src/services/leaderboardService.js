@@ -1,4 +1,4 @@
-const { ChannelType, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { ChannelType, PermissionFlagsBits } = require('discord.js');
 const db = require('../database/db');
 const config = require('../config');
 
@@ -98,23 +98,33 @@ module.exports = {
     const nowSeconds = Math.floor(Date.now() / 1000);
     const sinceTimestamp = nowSeconds - conf.durationSeconds;
 
-    const topPhotos = db.getTopPhotosByTimeframe(guild.id, sinceTimestamp, 10);
-
-    const embed = new EmbedBuilder()
-      .setColor(conf.color)
-      .setTitle(`${conf.icon} ${conf.name}`)
-      .setFooter({ text: `${config.footerText} • Timeframe: Past ${Math.round(conf.durationSeconds / 86400)} Day(s)` })
-      .setTimestamp();
+    let topPhotos = db.getTopPhotosByTimeframe(guild.id, sinceTimestamp, 10);
+    let isFallback = false;
 
     if (!topPhotos || topPhotos.length === 0) {
-      if (!isManual) {
-        db.setLastLeaderboardRun(conf.key, guild.id, nowSeconds);
-        console.log(`ℹ️ [Leaderboard] ${conf.name} for ${guild.name} skipped (0 photo submissions in timeframe). Timestamp updated.`);
-        return null;
-      }
+      topPhotos = db.getAllTopPhotos(guild.id, 10);
+      isFallback = true;
+    }
 
-      embed.setDescription(`*No photo submissions were voted on in this timeframe.*`);
-      return channel.send({ embeds: [embed] });
+    const componentsV2 = require('../utils/componentsV2');
+
+    if (!topPhotos || topPhotos.length === 0) {
+      const emptyContainer = componentsV2.createContainer({
+        accentColor: conf.color || 0xF1C40F,
+        components: [
+          componentsV2.createSection({
+            text:
+              `# ${conf.icon} ${conf.name}\n\n` +
+              `*No planespotting photos have been rated yet!*\n\n` +
+              `📸 Upload your aviation photos in <#${guild.channels.cache.find(c => c.name.includes('photo-submit'))?.id || 'photo-submit'}> ` +
+              `and vote in <#${guild.channels.cache.find(c => c.name.includes('pic-rating'))?.id || 'pic-rating'}> to appear on the leaderboard!`
+          })
+        ]
+      });
+
+      const msg = await componentsV2.sendToChannel(guild.client, channel.id, [emptyContainer]);
+      db.setLastLeaderboardRun(conf.key, guild.id, nowSeconds);
+      return { channel, message: msg, topPhotos: [] };
     }
 
     // Top 1 Showcase
@@ -134,14 +144,15 @@ module.exports = {
       rankList += `${medal} ${userTag} — **${p.total_points} pts** (*${avg}/10* • ${p.vote_count} votes)\n`;
     }
 
-    const componentsV2 = require('../utils/componentsV2');
+    const subtitleNotice = isFallback ? `*(Top Spotter Showcase)*` : `*(Past ${Math.round(conf.durationSeconds / 86400)} Days)*`;
+
     const container = componentsV2.createContainer({
       accentColor: conf.color || 0xF1C40F,
       components: [
         componentsV2.createMediaGallery([winner.image_url]),
         componentsV2.createSection({
           text:
-            `# ${conf.icon} ${conf.name}\n\n` +
+            `# ${conf.icon} ${conf.name} ${subtitleNotice}\n\n` +
             `🥇 **1st Place Champion:** <@${winner.user_id}>\n` +
             `🏆 **${winner.total_points} Points** • ⭐ **${winnerAvg}/10 Avg** • 🗳️ **${winner.vote_count} Votes**\n` +
             (winner.caption ? `📝 *"${winner.caption}"*\n\n` : '\n') +
@@ -154,7 +165,7 @@ module.exports = {
     db.setLastLeaderboardRun(conf.key, guild.id, nowSeconds);
 
     // Award XP to Winners
-    if (conf.xpRewards) {
+    if (conf.xpRewards && !isFallback) {
       for (let i = 0; i < Math.min(topPhotos.length, conf.xpRewards.length); i++) {
         const xpAmount = conf.xpRewards[i];
         if (xpAmount > 0) {
@@ -162,10 +173,6 @@ module.exports = {
           db.addXP(photo.user_id, guild.id, xpAmount);
         }
       }
-    }
-
-    if (!isManual) {
-      db.setLastLeaderboardRun(conf.key, guild.id, nowSeconds);
     }
 
     return { channel, message: msg, topPhotos };

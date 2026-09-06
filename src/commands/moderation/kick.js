@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const config = require('../../config');
 const suspensionManager = require('../../utils/suspensionManager');
 
@@ -73,41 +74,32 @@ module.exports = {
         interaction.user
       );
 
-      const suspendEmbed = new EmbedBuilder()
-        .setColor(config.colors.warning)
-        .setTitle(`${config.emojis.shield} Member Quarantined (Kick Pending • Case #${caseNumber})`)
-        .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-        .setDescription(
-          `**${targetUser.tag}** has been moved to their private jail channel ${jailChannel} and assigned \`⛔ㆍSuspended\`.\n` +
-          `They have **5 days** (<t:${expiresAtSeconds}:R>) to submit an appeal before the kick is finalized.`
-        )
-        .addFields(
-          { name: 'User', value: `${targetUser.tag} (\`${targetUser.id}\`)`, inline: true },
-          { name: 'Moderator', value: `${interaction.user.tag}`, inline: true },
-          { name: 'Jail Channel', value: `${jailChannel}`, inline: true },
-          { name: 'Reason', value: reason }
-        )
-        .setFooter({ text: `${config.footerText} • Case #${caseNumber}` })
-        .setTimestamp();
+      const container = componentsV2.createContainer({
+        accentColor: config.colors.warning,
+        components: [
+          componentsV2.createSection({
+            text: `# ${config.emojis.shield} Member Quarantined (Kick Pending • Case #${caseNumber})\n\n**${targetUser.tag}** has been moved to their private jail channel ${jailChannel} and assigned \`⛔ㆍSuspended\`.\nThey have **5 days** (<t:${expiresAtSeconds}:R>) to submit an appeal before the kick is finalized.\n\n**User**\n${targetUser.tag} (\`${targetUser.id}\`)\n\n**Moderator**\n${interaction.user.tag}\n\n**Jail Channel**\n${jailChannel}\n\n**Reason**\n${reason}\n\n*${config.footerText} • Case #${caseNumber}*`,
+            accessory: componentsV2.createThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
+          })
+        ]
+      });
 
-      return interaction.editReply({ embeds: [suspendEmbed] });
+      return componentsV2.editInteractionReply(interaction, [container]);
     }
 
     // Immediate kick
     await member.kick(`${interaction.user.tag}: ${reason}`);
 
-    const kickEmbed = new EmbedBuilder()
-      .setColor(config.colors.warning)
-      .setTitle(`${config.emojis.shield} Member Kicked (Immediate)`)
-      .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-      .addFields(
-        { name: 'User', value: `${targetUser.tag} (\`${targetUser.id}\`)`, inline: true },
-        { name: 'Moderator', value: `${interaction.user.tag}`, inline: true },
-        { name: 'Reason', value: reason }
-      )
-      .setFooter({ text: config.footerText })
-      .setTimestamp();
+    const containerImmediate = componentsV2.createContainer({
+      accentColor: config.colors.warning,
+      components: [
+        componentsV2.createSection({
+          text: `# ${config.emojis.shield} Member Kicked (Immediate)\n\n**User**\n${targetUser.tag} (\`${targetUser.id}\`)\n\n**Moderator**\n${interaction.user.tag}\n\n**Reason**\n${reason}\n\n*${config.footerText}*`,
+          accessory: componentsV2.createThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
+        })
+      ]
+    });
 
-    await interaction.reply({ embeds: [kickEmbed] });
+    await componentsV2.replyToInteraction(interaction, [containerImmediate]);
   }
 };

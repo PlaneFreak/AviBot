@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const jetphotosService = require('../../services/jetphotosService');
 const config = require('../../config');
 
@@ -38,13 +39,16 @@ module.exports = {
       );
 
       if (!result.verified) {
-        const failEmbed = new EmbedBuilder()
-          .setColor(config.colors.error)
-          .setTitle('❌ JetPhotos Verification Failed')
-          .setDescription(result.reason)
-          .setFooter({ text: `${config.footerText} • Anti-Impersonation Check` });
+        const mdText = `# ❌ JetPhotos Verification Failed\n\n${result.reason}\n\n*${config.footerText} • Anti-Impersonation Check*`;
+        
+        const container = componentsV2.createContainer({
+          accentColor: config.colors.error,
+          components: [
+            componentsV2.createSection({ text: mdText })
+          ]
+        });
 
-        return interaction.editReply({ embeds: [failEmbed] });
+        return componentsV2.editInteractionReply(interaction, [container]);
       }
 
       let statusTitle = '✈️ JetPhotos Spotter Verified!';
@@ -65,19 +69,21 @@ module.exports = {
         roleDescription = `ℹ️ Your account ownership was verified, but you currently have **0 accepted photos** on JetPhotos.\n\n*The **@${jetphotosService.JP_SPOTTER_ROLE_NAME}** role requires at least **1 accepted photo**. Keep uploading to JetPhotos and re-run \`/jetphotos-verify\` once your first photo gets accepted!*`;
       }
 
-      const successEmbed = new EmbedBuilder()
-        .setColor(statusColor)
-        .setTitle(statusTitle)
-        .setDescription(
-          `Congratulations ${member}! Your personal JetPhotos account ownership has been successfully authenticated.\n\n` +
-          `**Authenticated Account Data:**\n` +
-          `• 👤 **Photographer:** \`${result.username || 'JetPhotos User'}\`\n` +
-          `• 📸 **Accepted Database Photos:** **${result.photoCount}** photos\n` +
-          `• 📊 **Private Acceptance Rate:** **${result.acceptanceRate || 'Verified'}** *(Proof of Ownership)*\n\n` +
-          roleDescription
-        )
-        .setFooter({ text: `${config.footerText} • Verified via Gemini AI Vision` })
-        .setTimestamp();
+      let successMd = `# ${statusTitle}\n\n`;
+      successMd += `Congratulations ${member}! Your personal JetPhotos account ownership has been successfully authenticated.\n\n`;
+      successMd += `**Authenticated Account Data:**\n`;
+      successMd += `• 👤 **Photographer:** \`${result.username || 'JetPhotos User'}\`\n`;
+      successMd += `• 📸 **Accepted Database Photos:** **${result.photoCount}** photos\n`;
+      successMd += `• 📊 **Private Acceptance Rate:** **${result.acceptanceRate || 'Verified'}** *(Proof of Ownership)*\n\n`;
+      successMd += `${roleDescription}\n\n`;
+      successMd += `*${config.footerText} • Verified via Gemini AI Vision* <t:${Math.floor(Date.now() / 1000)}:R>`;
+
+      const successContainer = componentsV2.createContainer({
+        accentColor: statusColor,
+        components: [
+          componentsV2.createSection({ text: successMd })
+        ]
+      });
 
       // If user unlocked JP Pro (150+ photos), announce in #chat or #jetphotos
       if (result.isPro) {
@@ -86,21 +92,23 @@ module.exports = {
                           channels.find(c => c && c.name.toLowerCase().includes('chat') && !c.name.includes('staff'));
 
         if (jpChannel) {
-          const announceEmbed = new EmbedBuilder()
-            .setColor(0xF1C40F)
-            .setTitle('🏆 New JetPhotos PRO Spotter In the Server!')
-            .setDescription(
-              `Give it up for ${member} who just verified their JetPhotos portfolio with **${result.photoCount} accepted photos**!\n\n` +
-              `🎖️ Role Awarded: **@${jetphotosService.JP_PRO_ROLE_NAME}**`
-            )
-            .setFooter({ text: `${config.footerText} • Congratulations!` })
-            .setTimestamp();
+          const announceMd = `# 🏆 New JetPhotos PRO Spotter In the Server!\n\n`;
+          announceMd += `Give it up for ${member} who just verified their JetPhotos portfolio with **${result.photoCount} accepted photos**!\n\n`;
+          announceMd += `🎖️ Role Awarded: **@${jetphotosService.JP_PRO_ROLE_NAME}**\n\n`;
+          announceMd += `*${config.footerText} • Congratulations!* <t:${Math.floor(Date.now() / 1000)}:R>`;
+          
+          const announceContainer = componentsV2.createContainer({
+            accentColor: 0xF1C40F,
+            components: [
+              componentsV2.createSection({ text: announceMd })
+            ]
+          });
 
-          await jpChannel.send({ embeds: [announceEmbed] }).catch(() => {});
+          await componentsV2.sendToChannel(interaction.client, jpChannel.id, [announceContainer]);
         }
       }
 
-      return interaction.editReply({ embeds: [successEmbed] });
+      return componentsV2.editInteractionReply(interaction, [successContainer]);
     } catch (err) {
       console.error('Error in /jetphotos-verify command:', err);
       return interaction.editReply({

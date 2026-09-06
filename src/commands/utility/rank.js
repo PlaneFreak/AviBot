@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const db = require('../../database/db');
 const levelHelper = require('../../utils/levelHelper');
 const config = require('../../config');
@@ -32,57 +33,48 @@ module.exports = {
     const jpVerified = profile.jp_verified;
     const jpPhotos = profile.jp_photo_count || 0;
 
-    const embed = new EmbedBuilder()
-      .setColor(config.colors.primary)
-      .setAuthor({
-        name: `${targetUser.tag}’s Aviator Profile`,
-        iconURL: targetUser.displayAvatarURL({ dynamic: true })
-      })
-      .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 256 }))
-      .addFields(
-        {
-          name: '💬 Community Activity Level',
-          value:
-            `🎖️ **${chatLevelData.rankTitle}** • **Level ${chatLevelData.level}**\n` +
-            `✨ **${chatLevelData.totalXP}** Chat XP • 💬 **${profile.messages_count || 0}** Messages\n` +
-            `📊 \`${chatLevelData.progressBar}\` (${chatLevelData.xpInCurrentLevel}/${chatLevelData.xpNeededForNext} XP to Lvl ${chatLevelData.level + 1})`,
-          inline: false
-        },
-        {
-          name: '📸 Planespotter Photo Level',
-          value:
-            `🎖️ **${spotterLevelData.rankTitle}** • **Level ${spotterLevelData.level}**\n` +
-            `🏆 **#${stats.rank}** on server • ✨ **${spotterLevelData.totalXP}** Photo XP\n` +
-            `🖼️ **${stats.totalSubmissions}** Submissions • ⭐ **${stats.totalPointsEarned}** Points\n` +
-            `📊 \`${spotterLevelData.progressBar}\``,
-          inline: false
-        }
-      );
+    let mdText = `**${targetUser.tag}’s Aviator Profile**\n\n`;
+    mdText += `**💬 Community Activity Level**\n`;
+    mdText += `🎖️ **${chatLevelData.rankTitle}** • **Level ${chatLevelData.level}**\n`;
+    mdText += `✨ **${chatLevelData.totalXP}** Chat XP • 💬 **${profile.messages_count || 0}** Messages\n`;
+    mdText += `📊 \`${chatLevelData.progressBar}\` (${chatLevelData.xpInCurrentLevel}/${chatLevelData.xpNeededForNext} XP to Lvl ${chatLevelData.level + 1})\n\n`;
+
+    mdText += `**📸 Planespotter Photo Level**\n`;
+    mdText += `🎖️ **${spotterLevelData.rankTitle}** • **Level ${spotterLevelData.level}**\n`;
+    mdText += `🏆 **#${stats.rank}** on server • ✨ **${spotterLevelData.totalXP}** Photo XP\n`;
+    mdText += `🖼️ **${stats.totalSubmissions}** Submissions • ⭐ **${stats.totalPointsEarned}** Points\n`;
+    mdText += `📊 \`${spotterLevelData.progressBar}\`\n\n`;
 
     if (jpVerified) {
-      embed.addFields({
-        name: '✈️ JetPhotos Status',
-        value: `✅ Verified as \`${profile.jp_username || 'Photographer'}\` with **${jpPhotos} accepted photos** (${profile.jp_acceptance_rate || 'verified rate'})`,
-        inline: false
-      });
+      mdText += `**✈️ JetPhotos Status**\n✅ Verified as \`${profile.jp_username || 'Photographer'}\` with **${jpPhotos} accepted photos** (${profile.jp_acceptance_rate || 'verified rate'})\n\n`;
     }
+
+    const components = [];
 
     if (stats.bestPhoto) {
       const avg = stats.bestPhoto.vote_count > 0 ? (stats.bestPhoto.total_rating_sum / stats.bestPhoto.vote_count).toFixed(1) : '0.0';
-      embed.addFields({
-        name: '🌟 Personal Best Spotter Submission',
-        value: `🏆 **${stats.bestPhoto.total_points} pts** (⭐ ${avg}/10 • 🗳️ ${stats.bestPhoto.vote_count} votes)${stats.bestPhoto.caption ? `\n📝 *"${stats.bestPhoto.caption}"*` : ''}`,
-        inline: false
-      });
-
+      mdText += `**🌟 Personal Best Spotter Submission**\n`;
+      mdText += `🏆 **${stats.bestPhoto.total_points} pts** (⭐ ${avg}/10 • 🗳️ ${stats.bestPhoto.vote_count} votes)${stats.bestPhoto.caption ? `\n📝 *"${stats.bestPhoto.caption}"*` : ''}\n\n`;
+      
       if (stats.bestPhoto.image_url) {
-        embed.setImage(stats.bestPhoto.image_url);
+        components.push(componentsV2.createMediaGallery([stats.bestPhoto.image_url]));
       }
     }
 
-    embed.setFooter({ text: `${config.footerText} • Chat to level up activity | Upload photos to level up spotter rank!` });
-    embed.setTimestamp();
+    mdText += `*${config.footerText} • Chat to level up activity | Upload photos to level up spotter rank!* <t:${Math.floor(Date.now() / 1000)}:R>`;
 
-    await interaction.reply({ embeds: [embed] });
+    components.push(
+      componentsV2.createSection({
+        text: mdText,
+        accessory: componentsV2.createThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 256 }))
+      })
+    );
+
+    const container = componentsV2.createContainer({
+      accentColor: config.colors.primary,
+      components: components
+    });
+
+    await componentsV2.replyToInteraction(interaction, [container]);
   }
 };

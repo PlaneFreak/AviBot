@@ -1,4 +1,4 @@
-const { PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { PermissionFlagsBits } = require('discord.js');
 const adminLogService = require('./adminLogService');
 const config = require('../config');
 
@@ -12,6 +12,17 @@ const MAX_DUPLICATE_COUNT = 3;      // Max 3 identical messages
 const MAX_MENTIONS = 4;             // Max 4 mentions per message
 const MAX_NEWLINES = 12;            // Max 12 line breaks
 const TIMEOUT_DURATION_MS = 5 * 60 * 1000; // 5 minutes timeout
+
+// Cleanup stale spam cache entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [userId, data] of userSpamCache) {
+    const lastActivity = data.timestamps?.length ? Math.max(...data.timestamps) : 0;
+    if (now - lastActivity > 10 * 60 * 1000) {
+      userSpamCache.delete(userId);
+    }
+  }
+}, 5 * 60 * 1000);
 
 module.exports = {
   /**
@@ -61,12 +72,16 @@ module.exports = {
         // Log authorization to Admin Logs
         const adminChannel = await adminLogService.getOrCreateAdminLogChannel(message.guild);
         if (adminChannel) {
-          const logEmbed = new EmbedBuilder()
-            .setColor(0x3498DB)
-            .setTitle('🔗 Sponsored Invite Link Allowed')
-            .setDescription(`**User:** ${member} (\`${member.user.tag}\`)\n**Channel:** ${message.channel}\n**Remaining Allowance:** ${remaining} invite(s) left`)
-            .setTimestamp();
-          await adminChannel.send({ embeds: [logEmbed] }).catch(() => {});
+          const componentsV2 = require('../utils/componentsV2');
+          const logContainer = componentsV2.createContainer({
+            accentColor: 0x3498DB,
+            components: [
+              componentsV2.createSection({
+                text: `# 🔗 Sponsored Invite Link Allowed\n\n**User:** ${member} (\`${member.user.tag}\`)\n**Channel:** ${message.channel}\n**Remaining Allowance:** ${remaining} invite(s) left`
+              })
+            ]
+          });
+          await componentsV2.sendToChannel(message.guild.client, adminChannel.id, [logContainer]).catch(() => {});
         }
 
         // Permitted: Do not delete, allow message through!
@@ -150,12 +165,16 @@ module.exports = {
       // Log to Admin Logs
       const adminChannel = await adminLogService.getOrCreateAdminLogChannel(guild);
       if (adminChannel) {
-        const logEmbed = new EmbedBuilder()
-          .setColor(0xE74C3C)
-          .setTitle('🛡️ Anti-Spam Action Taken')
-          .setDescription(`**User:** ${member} (\`${member.user.tag}\` - \`${member.id}\`)\n**Action:** 5-Minute Timeout\n**Reason:** ${reason}\n**Channel:** ${channel}`)
-          .setTimestamp();
-        await adminChannel.send({ embeds: [logEmbed] }).catch(() => {});
+        const componentsV2 = require('../utils/componentsV2');
+        const logContainer = componentsV2.createContainer({
+          accentColor: 0xE74C3C,
+          components: [
+            componentsV2.createSection({
+              text: `# 🛡️ Anti-Spam Action Taken\n\n**User:** ${member} (\`${member.user.tag}\` - \`${member.id}\`)\n**Action:** 5-Minute Timeout\n**Reason:** ${reason}\n**Channel:** ${channel}`
+            })
+          ]
+        });
+        await componentsV2.sendToChannel(guild.client, adminChannel.id, [logContainer]).catch(() => {});
       }
 
       // Send DM

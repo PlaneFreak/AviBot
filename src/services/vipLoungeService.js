@@ -1,4 +1,4 @@
-const { ChannelType, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { ChannelType, PermissionFlagsBits } = require('discord.js');
 const config = require('../config');
 
 const VIP_CATEGORY_NAME = '⭐ ┃ VIP LOUNGE';
@@ -114,22 +114,17 @@ module.exports = {
         console.log(`🍸 Created #${vipTextChannel.name} in VIP category`);
 
         // Post welcome banner embed
-        const welcomeEmbed = new EmbedBuilder()
-          .setColor(0xF1C40F)
-          .setTitle('🍸 Welcome to the Exclusive VIP Lounge')
-          .setDescription(
-            `### ⭐ Welcome to your Private Salon!\n\n` +
-            `This channel is an exclusive hangout space reserved entirely for our **⭐ VIP members**, server supporters, and staff.\n\n` +
-            `**VIP Perks in this channel:**\n` +
-            `• 💬 **Relaxed, private conversation atmosphere**\n` +
-            `• 📎 **Direct media, attachment & external emoji access**\n` +
-            `• 🎙️ **Priority voice channel access in 🔊ㆍVIP Lounge**\n\n` +
-            `*Enjoy your stay and thank you for supporting the community!*`
-          )
-          .setFooter({ text: `${config.footerText} • VIP Exclusive Lounge` })
-          .setTimestamp();
+        const componentsV2 = require('../utils/componentsV2');
+        const welcomeContainer = componentsV2.createContainer({
+          accentColor: 0xF1C40F,
+          components: [
+            componentsV2.createSection({
+              text: `# 🍸 Welcome to the Exclusive VIP Lounge\n\n### ⭐ Welcome to your Private Salon!\n\nThis channel is an exclusive hangout space reserved entirely for our **⭐ VIP members**, server supporters, and staff.\n\n**VIP Perks in this channel:**\n• 💬 **Relaxed, private conversation atmosphere**\n• 📎 **Direct media, attachment & external emoji access**\n• 🎙️ **Priority voice channel access in 🔊ㆍVIP Lounge**\n\n*Enjoy your stay and thank you for supporting the community!*\n\n*${config.footerText} • VIP Exclusive Lounge*`
+            })
+          ]
+        });
 
-        await vipTextChannel.send({ embeds: [welcomeEmbed] }).catch(() => {});
+        await componentsV2.sendToChannel(guild.client, vipTextChannel.id, [welcomeContainer]).catch(() => {});
       }
 
       // 3. Find or create 🔊ㆍVIP Lounge (Voice)

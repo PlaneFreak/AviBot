@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const config = require('../../config');
 
 module.exports = {
@@ -8,45 +9,23 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 
   async execute(interaction) {
-    const embed = new EmbedBuilder()
-      .setColor(config.colors.primary)
-      .setTitle('🛡️ Anti-Spam Protection Suite')
-      .setDescription('The anti-spam engine is active 24/7 across all text channels:')
-      .addFields(
-        {
-          name: '⚡ Rapid Message Flood',
-          value: 'Max **5 messages** in **4 seconds** ➔ Message deletion & 5m Timeout',
-          inline: false
-        },
-        {
-          name: '🔁 Duplicate Text Spam',
-          value: 'Max **3 identical messages** in 10 seconds ➔ Message deletion & 5m Timeout',
-          inline: false
-        },
-        {
-          name: '📢 Mass Mention Spam',
-          value: 'Max **4 user/role mentions** or unauthorized `@everyone` ➔ Message deletion & 5m Timeout',
-          inline: false
-        },
-        {
-          name: '🔗 Unauthorized Discord Invites',
-          value: 'Discord invite links (`discord.gg/...`) from non-staff are automatically blocked & removed',
-          inline: false
-        },
-        {
-          name: '📜 Wall of Text / Line Flood',
-          value: 'Messages with >12 line breaks are auto-deleted with a warning',
-          inline: false
-        },
-        {
-          name: '🛡️ Role Bypasses',
-          value: 'Staff (`Admin`, `Moderator`) and `🧪ㆍTester` roles bypass filters',
-          inline: false
-        }
-      )
-      .setFooter({ text: `${config.footerText} • Realtime Chat Defense` })
-      .setTimestamp();
+    const container = componentsV2.createContainer({
+      accentColor: config.colors.primary,
+      components: [
+        componentsV2.createSection({
+          text: `# 🛡️ Anti-Spam Protection Suite\n\n` +
+                `The anti-spam engine is active 24/7 across all text channels:\n\n` +
+                `**⚡ Rapid Message Flood**\nMax **5 messages** in **4 seconds** ➔ Message deletion & 5m Timeout\n\n` +
+                `**🔁 Duplicate Text Spam**\nMax **3 identical messages** in 10 seconds ➔ Message deletion & 5m Timeout\n\n` +
+                `**📢 Mass Mention Spam**\nMax **4 user/role mentions** or unauthorized \`@everyone\` ➔ Message deletion & 5m Timeout\n\n` +
+                `**🔗 Unauthorized Discord Invites**\nDiscord invite links (\`discord.gg/...\`) from non-staff are automatically blocked & removed\n\n` +
+                `**📜 Wall of Text / Line Flood**\nMessages with >12 line breaks are auto-deleted with a warning\n\n` +
+                `**🛡️ Role Bypasses**\nStaff (\`Admin\`, \`Moderator\`) and \`🧪ㆍTester\` roles bypass filters\n\n` +
+                `*${config.footerText} • Realtime Chat Defense*`
+        })
+      ]
+    });
 
-    return interaction.reply({ embeds: [embed], flags: 64 });
+    return componentsV2.replyToInteraction(interaction, [container], { ephemeral: true });
   }
 };

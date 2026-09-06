@@ -1,5 +1,6 @@
-const { ChannelType, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { ChannelType, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const config = require('../config');
+const componentsV2 = require('../utils/componentsV2');
 
 const VERIFIED_ROLE_NAME = '✈️ㆍVerified';
 const VERIFY_CHANNEL_NAME = '✅ㆍverify';
@@ -360,30 +361,19 @@ module.exports = {
     const picRatingChannel = channels.find(c => c && c.name.toLowerCase().includes('pic-rating'));
     const rolesChannel = channels.find(c => c && c.name.toLowerCase().includes('roles'));
 
-    const welcomeEmbed = new EmbedBuilder()
-      .setColor(0x2ECC71)
-      .setAuthor({
-        name: `✈️ New Aviator Aboard!`,
-        iconURL: member.user.displayAvatarURL({ dynamic: true })
-      })
-      .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
-      .setDescription(
-        `Welcome to **${guild.name}**, ${member}!\n\n` +
-        `🎉 You are officially verified as member **#${guild.memberCount}**!\n\n` +
-        `**Next Steps:**\n` +
-        `• Chat with the community in ${chatChannel || '#chat'}\n` +
-        `• Upload & rate spotter photos in ${picRatingChannel || '#pic-rating'}\n` +
-        `• Pick up your custom roles in ${rolesChannel || '#roles'}\n\n` +
-        `*Fasten your seatbelts and enjoy your stay!* 🛫`
-      )
-      .setFooter({ text: `${config.footerText} • Verified Arrival` })
-      .setTimestamp();
+    const welcomeContainer = componentsV2.createContainer({
+      accentColor: 0x2ECC71,
+      components: [
+        componentsV2.createSection({
+          text: `**✈️ New Aviator Aboard!**\n\nWelcome to **${guild.name}**, ${member}!\n\n🎉 You are officially verified as member **#${guild.memberCount}**!\n\n**Next Steps:**\n• Chat with the community in ${chatChannel || '#chat'}\n• Upload & rate spotter photos in ${picRatingChannel || '#pic-rating'}\n• Pick up your custom roles in ${rolesChannel || '#roles'}\n\n*Fasten your seatbelts and enjoy your stay!* 🛫\n\n*${config.footerText} • Verified Arrival*`,
+          accessory: componentsV2.createThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
+        })
+      ]
+    });
 
     // ALWAYS SEND A BRAND-NEW MESSAGE (DO NOT EDIT)
-    await verifiedWelcomeChannel.send({
-      content: `🎉 Welcome aboard, ${member}!`,
-      embeds: [welcomeEmbed]
-    });
+    await verifiedWelcomeChannel.send({ content: `🎉 Welcome aboard, ${member}!` });
+    await componentsV2.sendToChannel(guild.client, verifiedWelcomeChannel.id, [welcomeContainer]);
   },
 
   /**
@@ -398,18 +388,14 @@ module.exports = {
 
     const verifyMention = verifyChannel ? `<#${verifyChannel.id}>` : '**#✅ㆍverify**';
 
-    const embed = new EmbedBuilder()
-      .setColor(config.colors.primary)
-      .setTitle(`🛫 Welcome to ${guild.name}!`)
-      .setDescription(
-        `### 🔒 Verification Required to Unlock Server\n\n` +
-        `Welcome to our Aviation & Plane Spotting Community!\n` +
-        `To protect our server against automated spam bots, all channels are currently hidden.\n\n` +
-        `👉 **Please head over to ${verifyMention} and click the \`✅ Verify & Enter\` button!**\n\n` +
-        `Once verified, all chat lounges, photo rating contests, spotting discussions, and voice channels will unlock immediately!`
-      )
-      .setFooter({ text: `${config.footerText} • Verification Required` })
-      .setTimestamp();
+    const welcomeContainer = componentsV2.createContainer({
+      accentColor: config.colors.primary,
+      components: [
+        componentsV2.createSection({
+          text: `# 🛫 Welcome to ${guild.name}!\n\n### 🔒 Verification Required to Unlock Server\n\nWelcome to our Aviation & Plane Spotting Community!\nTo protect our server against automated spam bots, all channels are currently hidden.\n\n👉 **Please head over to ${verifyMention} and click the \`✅ Verify & Enter\` button!**\n\nOnce verified, all chat lounges, photo rating contests, spotting discussions, and voice channels will unlock immediately!\n\n*${config.footerText} • Verification Required*`
+        })
+      ]
+    });
 
     const messages = await unverifiedWelcomeChannel.messages.fetch({ limit: 20 }).catch(() => null);
     if (messages) {
@@ -424,16 +410,16 @@ module.exports = {
       }
     }
 
-    // Check if clean English embed exists
+    // Check if clean English embed exists (Since we use V2 now, the container will likely create an embed without a typical title, so let's adjust check)
     const refreshedMessages = await unverifiedWelcomeChannel.messages.fetch({ limit: 10 }).catch(() => null);
     const hasEnglishWelcome = refreshedMessages && refreshedMessages.some(m =>
       m.author.id === guild.client.user.id &&
-      m.embeds.some(e => e.title?.includes('Welcome to') && e.description?.includes('Verification Required'))
+      m.embeds.some(e => e.description?.includes('Verification Required'))
     );
 
     if (!hasEnglishWelcome) {
-      await unverifiedWelcomeChannel.send({ embeds: [embed] });
-      console.log(`✅ Clean English Welcome Embed sent to #${unverifiedWelcomeChannel.name} (${guild.name})`);
+      await componentsV2.sendToChannel(guild.client, unverifiedWelcomeChannel.id, [welcomeContainer]);
+      console.log(`✅ Clean English Welcome Container sent to #${unverifiedWelcomeChannel.name} (${guild.name})`);
     }
   },
 
@@ -454,22 +440,16 @@ module.exports = {
     const hasHeader = messages && messages.some(m => m.author.id === guild.client.user.id && m.embeds.length > 0);
 
     if (!hasHeader) {
-      const headerEmbed = new EmbedBuilder()
-        .setColor(config.colors.primary)
-        .setTitle(`🛫 Community Arrivals & Member Lounge`)
-        .setDescription(
-          `Welcome to the official verified arrivals lounge of **${guild.name}**!\n\n` +
-          `Whenever a new member completes verification, they will be greeted here.\n\n` +
-          `**Quick Navigation:**\n` +
-          `• 💬 **General Chat:** <#${chatChannel?.id || 'chat'}> — Daily aviation talk & banter\n` +
-          `• 📷 **Photo Rating:** <#${picRatingChannel?.id || 'pic-rating'}> — Spotter photo contests & leaderboards\n` +
-          `• 🎨 **Role Picker:** <#${rolesChannel?.id || 'roles'}> — Select notification and hobby roles\n` +
-          `• 📜 **Guidelines:** <#${rulesChannel?.id || 'rules'}> — Server rules and spotter code`
-        )
-        .setFooter({ text: `${config.footerText} • Verified Lounge` })
-        .setTimestamp();
+      const headerContainer = componentsV2.createContainer({
+        accentColor: config.colors.primary,
+        components: [
+          componentsV2.createSection({
+            text: `# 🛫 Community Arrivals & Member Lounge\n\nWelcome to the official verified arrivals lounge of **${guild.name}**!\n\nWhenever a new member completes verification, they will be greeted here.\n\n**Quick Navigation:**\n• 💬 **General Chat:** <#${chatChannel?.id || 'chat'}> — Daily aviation talk & banter\n• 📷 **Photo Rating:** <#${picRatingChannel?.id || 'pic-rating'}> — Spotter photo contests & leaderboards\n• 🎨 **Role Picker:** <#${rolesChannel?.id || 'roles'}> — Select notification and hobby roles\n• 📜 **Guidelines:** <#${rulesChannel?.id || 'rules'}> — Server rules and spotter code\n\n*${config.footerText} • Verified Lounge*`
+          })
+        ]
+      });
 
-      await verifiedWelcomeChannel.send({ embeds: [headerEmbed] });
+      await componentsV2.sendToChannel(guild.client, verifiedWelcomeChannel.id, [headerContainer]);
     }
   },
 
@@ -506,7 +486,6 @@ module.exports = {
 
     if (hasPanel) return;
 
-    const componentsV2 = require('../utils/componentsV2');
     const container = componentsV2.createContainer({
       accentColor: config.colors.primary,
       components: [

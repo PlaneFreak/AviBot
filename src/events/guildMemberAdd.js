@@ -13,14 +13,22 @@ module.exports = {
       );
 
       if (welcomeChannel) {
-        // Send ghost ping notification in #welcome that immediately deletes
-        const pingMsg = await welcomeChannel.send({
-          content: `${member} check out this channel.`
-        });
+        try {
+          // Send ghost ping notification in #welcome that immediately deletes
+          const pingMsg = await welcomeChannel.send({
+            content: `${member} check out this channel.`
+          });
 
-        await pingMsg.delete().catch(() => {});
-        console.log(`👋 Sent and deleted instant welcome ping for ${member.user.tag} in #${welcomeChannel.name}`);
+          await pingMsg.delete().catch(() => {});
+          console.log(`👋 Sent and deleted instant welcome ping for ${member.user.tag} in #${welcomeChannel.name}`);
+        } catch (pingErr) {
+          console.error('Failed to send welcome ping:', pingErr);
+        }
       }
+
+      // Invite Counter Tracking (Detects exact inviter, vanity URL, and anti-fake/alt detection)
+      const inviteService = require('../services/inviteService');
+      await inviteService.handleMemberJoin(member).catch(() => {});
 
       // Anti-Raid Security Monitor (Mass Join / Flood Defense)
       const antiRaidService = require('../services/antiRaidService');

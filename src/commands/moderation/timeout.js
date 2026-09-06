@@ -1,6 +1,6 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const config = require('../../config');
-const appealHelper = require('../../utils/appealHelper');
 
 // Helper function to parse duration string like "10m", "2h", "1d"
 function parseDuration(str) {
@@ -96,25 +96,31 @@ module.exports = {
       });
     }
 
-    // Try sending DM with Appeal Button and DM Reply option
-    const dmEmbed = new EmbedBuilder()
-      .setColor(config.colors.warning)
-      .setTitle(`⏳ You have been timed out in ${interaction.guild.name}`)
-      .setDescription(
-        'If you believe this punishment was unfair or made in error, you can submit an appeal.\n\n' +
-        '**How to Appeal:**\n' +
-        '• Click the **Submit Appeal** button below\n' +
-        '• **OR** simply **reply directly to this DM** with your explanation/apology!'
-      )
-      .addFields(
-        { name: 'Duration', value: durationInput },
-        { name: 'Reason', value: reason },
-        { name: 'Moderator', value: interaction.user.tag }
-      )
-      .setTimestamp();
+    const appealBtn = componentsV2.createButton({
+      customId: `appeal_open_${interaction.guild.id}_timeout`,
+      label: 'Submit Appeal',
+      style: 1,
+      emoji: '📝'
+    });
 
-    const appealRow = appealHelper.createAppealButton(interaction.guild.id, 'timeout');
-    await member.send({ embeds: [dmEmbed], components: [appealRow] }).catch(() => {});
+    const dmContainer = componentsV2.createContainer({
+      accentColor: config.colors.warning,
+      components: [
+        componentsV2.createSection({
+          text: `# ⏳ You have been timed out in ${interaction.guild.name}\n\n` +
+                'If you believe this punishment was unfair or made in error, you can submit an appeal.\n\n' +
+                '**How to Appeal:**\n' +
+                '• Click the **Submit Appeal** button below\n' +
+                '• **OR** simply **reply directly to this DM** with your explanation/apology!\n\n' +
+                `**Duration**\n${durationInput}\n\n` +
+                `**Reason**\n${reason}\n\n` +
+                `**Moderator**\n${interaction.user.tag}`
+        }),
+        componentsV2.createActionRow([appealBtn])
+      ]
+    });
+
+    await componentsV2.sendDM(interaction.client, member.id, [dmContainer]);
 
     // Record punishment for seamless DM appeal routing
     const punishmentTracker = require('../../data/punishmentTracker');
@@ -127,21 +133,30 @@ module.exports = {
     });
 
     // Apply timeout
-    await member.timeout(durationMs, `${interaction.user.tag}: ${reason}`);
+    try {
+      await member.timeout(durationMs, `${interaction.user.tag}: ${reason}`);
+    } catch (err) {
+      return interaction.reply({
+        content: `❌ Failed to timeout user: ${err.message}`,
+        ephemeral: true
+      });
+    }
 
-    const timeoutEmbed = new EmbedBuilder()
-      .setColor(config.colors.warning)
-      .setTitle(`${config.emojis.shield} Member Timed Out`)
-      .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-      .addFields(
-        { name: 'User', value: `${targetUser.tag} (\`${targetUser.id}\`)`, inline: true },
-        { name: 'Duration', value: durationInput, inline: true },
-        { name: 'Moderator', value: `${interaction.user.tag}`, inline: true },
-        { name: 'Reason', value: reason }
-      )
-      .setFooter({ text: config.footerText })
-      .setTimestamp();
+    const timeoutContainer = componentsV2.createContainer({
+      accentColor: config.colors.warning,
+      components: [
+        componentsV2.createSection({
+          text: `# ${config.emojis.shield} Member Timed Out\n\n` +
+                `**User**\n${targetUser.tag} (\`${targetUser.id}\`)\n\n` +
+                `**Duration**\n${durationInput}\n\n` +
+                `**Moderator**\n${interaction.user.tag}\n\n` +
+                `**Reason**\n${reason}\n\n` +
+                `*${config.footerText}*`,
+          accessory: componentsV2.createThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
+        })
+      ]
+    });
 
-    await interaction.reply({ embeds: [timeoutEmbed] });
+    await componentsV2.replyToInteraction(interaction, [timeoutContainer]);
   }
 };

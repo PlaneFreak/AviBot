@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const componentsV2 = require('../../utils/componentsV2');
 const antiRaidService = require('../../services/antiRaidService');
 const config = require('../../config');
 
@@ -39,36 +40,22 @@ module.exports = {
     const guild = interaction.guild;
 
     if (sub === 'status') {
-      const stats = antiRaidService.getStatus();
-      const embed = new EmbedBuilder()
-        .setColor(stats.isLockdownActive ? 0xE74C3C : config.colors.primary)
-        .setTitle('🛡️ Anti-Raid Security Status')
-        .addFields(
-          {
-            name: '🔒 Lockdown Active',
-            value: stats.isLockdownActive ? '🚨 **YES (Active)**' : '🟢 **No (Normal)**',
-            inline: true
-          },
-          {
-            name: '⚡ Join Trigger Window',
-            value: `**${stats.threshold} joins** / **${stats.windowSeconds}s**`,
-            inline: true
-          },
-          {
-            name: '🕒 Min Account Age',
-            value: `**${stats.minAccountAgeHours} hours**`,
-            inline: true
-          },
-          {
-            name: '📈 Recent Joins (10s)',
-            value: `**${stats.recentJoinCount}** joins detected`,
-            inline: true
-          }
-        )
-        .setFooter({ text: `${config.footerText} • Emergency Raid Protection` })
-        .setTimestamp();
+      const stats = antiRaidService.getStatus(guild.id);
+      const container = componentsV2.createContainer({
+        accentColor: stats.isLockdownActive ? 0xE74C3C : config.colors.primary,
+        components: [
+          componentsV2.createSection({
+            text: `# 🛡️ Anti-Raid Security Status\n\n` +
+                  `**🔒 Lockdown Active**\n${stats.isLockdownActive ? '🚨 **YES (Active)**' : '🟢 **No (Normal)**'}\n\n` +
+                  `**⚡ Join Trigger Window**\n**${stats.threshold} joins** / **${stats.windowSeconds}s**\n\n` +
+                  `**🕒 Min Account Age**\n**${stats.minAccountAgeHours} hours**\n\n` +
+                  `**📈 Recent Joins (10s)**\n**${stats.recentJoinCount}** joins detected\n\n` +
+                  `*${config.footerText} • Emergency Raid Protection*`
+          })
+        ]
+      });
 
-      return interaction.reply({ embeds: [embed], flags: 64 });
+      return componentsV2.replyToInteraction(interaction, [container], { ephemeral: true });
     }
 
     if (sub === 'lockdown') {

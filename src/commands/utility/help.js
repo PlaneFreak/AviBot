@@ -1,3 +1,6 @@
+// NOTE: help.js intentionally uses EmbedBuilder (not Components V2) because the
+// interactive StringSelectMenu collector relies on interaction.update() which is
+// incompatible with REST-based V2 container messages.
 const {
   SlashCommandBuilder,
   EmbedBuilder,
