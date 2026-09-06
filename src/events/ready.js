@@ -73,7 +73,7 @@ module.exports = {
           // 2. Check if channel is read-only (rules, news, welcome, roles, photo-leaderboard, pic-rating, appeal-hub, instagram, etc.)
           const overwrites = channel.permissionOverwrites.cache.get(everyoneRole.id);
           const isEveryoneDenied = overwrites && overwrites.deny.has(PermissionFlagsBits.SendMessages);
-          const isReadOnlyName = /news|rules|welcome|roles|leaderboard|pic-rating|appeal-hub|staff-news|instagram|insta/i.test(channel.name);
+          const isReadOnlyName = /news|rules|welcome|roles|leaderboard|pic-rating|appeal-hub|staff-news|instagram|insta|logs?/i.test(channel.name);
 
           if (isEveryoneDenied || isReadOnlyName) {
             // Read-only channel, leave slowmode at 0
