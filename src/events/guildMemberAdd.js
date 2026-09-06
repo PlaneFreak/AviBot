@@ -9,7 +9,8 @@ module.exports = {
       const guild = member.guild;
       const channels = await guild.channels.fetch();
       const welcomeChannel = channels.find(
-        c => c && c.type === ChannelType.GuildText && (c.name.toLowerCase().includes('welcome'))
+        c => c && c.type === ChannelType.GuildText &&
+        (c.id === '1525420784103723079' || (c.name.toLowerCase().includes('welcome') && !c.name.toLowerCase().includes('verified') && !c.topic?.includes('arrivals')))
       );
 
       if (welcomeChannel) {

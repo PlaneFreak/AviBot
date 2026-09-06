@@ -19,6 +19,7 @@ module.exports = {
       instagram: null,
       rules: '1524792139702337669',
       welcome: '1525420784103723079',
+      verifiedWelcome: '1542885159081218128',
       roles: '1525420839116472340',
       chat: '1524791880162869329',
       picRating: '1524791955111018526',

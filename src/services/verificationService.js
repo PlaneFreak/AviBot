@@ -4,12 +4,15 @@ const componentsV2 = require('../utils/componentsV2');
 
 const VERIFIED_ROLE_NAME = '✈️ㆍVerified';
 const VERIFY_CHANNEL_NAME = '✅ㆍverify';
-const WELCOME_CHANNEL_NAME = '👋ㆍwelcome';
+const UNVERIFIED_WELCOME_CHANNEL_NAME = '👋ㆍwelcome';
+const VERIFIED_WELCOME_CHANNEL_NAME = '🎉ㆍverified-welcome';
 
 module.exports = {
   VERIFIED_ROLE_NAME,
   VERIFY_CHANNEL_NAME,
-  WELCOME_CHANNEL_NAME,
+  UNVERIFIED_WELCOME_CHANNEL_NAME,
+  VERIFIED_WELCOME_CHANNEL_NAME,
+  WELCOME_CHANNEL_NAME: UNVERIFIED_WELCOME_CHANNEL_NAME,
 
   /**
    * Finds or creates the Verified role
@@ -38,7 +41,7 @@ module.exports = {
   },
 
   /**
-   * Finds or creates the ✅ㆍverify channel (visible ONLY to unverified members)
+   * Finds or creates the ✅ㆍverify channel (visible ONLY to unverified members, strictly locked)
    */
   async getOrCreateVerifyChannel(guild) {
     const channels = await guild.channels.fetch();
@@ -57,11 +60,20 @@ module.exports = {
       {
         id: everyoneRole.id,
         allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
-        deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions, PermissionFlagsBits.CreatePublicThreads]
+        deny: [
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.SendMessagesInThreads,
+          PermissionFlagsBits.CreatePublicThreads,
+          PermissionFlagsBits.CreatePrivateThreads,
+          PermissionFlagsBits.AddReactions,
+          PermissionFlagsBits.AttachFiles,
+          PermissionFlagsBits.EmbedLinks,
+          PermissionFlagsBits.UseApplicationCommands
+        ]
       },
       {
         id: verifiedRole.id,
-        deny: [PermissionFlagsBits.ViewChannel] // Hide verify channel once verified
+        deny: [PermissionFlagsBits.ViewChannel] // Strictly hide verify channel once verified
       }
     ];
 
@@ -83,7 +95,7 @@ module.exports = {
   },
 
   /**
-   * Finds or creates the unverified 👋ㆍwelcome channel (visible ONLY to unverified members)
+   * Finds or creates the unverified 👋ㆍwelcome channel (visible ONLY to unverified members, strictly locked)
    */
   async getOrCreateUnverifiedWelcomeChannel(guild) {
     const channels = await guild.channels.fetch();
@@ -94,27 +106,36 @@ module.exports = {
       c => c && c.type === ChannelType.GuildCategory && (c.name.toLowerCase().includes('important') || c.name.toLowerCase().includes('welcome'))
     );
 
-    // Look for channel named welcome that is designated for unverified (or has everyone view allowed)
+    // Look for channel designated for unverified welcome
     let channel = channels.find(
-      c => c && c.type === ChannelType.GuildText && c.name === WELCOME_CHANNEL_NAME &&
-      (c.topic?.includes('verify') || c.permissionOverwrites.cache.get(everyoneRole.id)?.allow.has(PermissionFlagsBits.ViewChannel))
+      c => c && c.type === ChannelType.GuildText &&
+      (c.id === '1525420784103723079' || (c.name === UNVERIFIED_WELCOME_CHANNEL_NAME && !c.topic?.includes('arrivals')))
     );
 
     const overwrites = [
       {
         id: everyoneRole.id,
         allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
-        deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions, PermissionFlagsBits.CreatePublicThreads]
+        deny: [
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.SendMessagesInThreads,
+          PermissionFlagsBits.CreatePublicThreads,
+          PermissionFlagsBits.CreatePrivateThreads,
+          PermissionFlagsBits.AddReactions,
+          PermissionFlagsBits.AttachFiles,
+          PermissionFlagsBits.EmbedLinks,
+          PermissionFlagsBits.UseApplicationCommands
+        ]
       },
       {
         id: verifiedRole.id,
-        deny: [PermissionFlagsBits.ViewChannel] // Hidden from verified members
+        deny: [PermissionFlagsBits.ViewChannel] // Strictly hidden from verified members
       }
     ];
 
     if (!channel) {
       channel = await guild.channels.create({
-        name: WELCOME_CHANNEL_NAME,
+        name: UNVERIFIED_WELCOME_CHANNEL_NAME,
         type: ChannelType.GuildText,
         parent: category ? category.id : null,
         position: 1,
@@ -130,7 +151,7 @@ module.exports = {
   },
 
   /**
-   * Finds or creates the verified 👋ㆍwelcome channel (visible ONLY to verified members)
+   * Finds or creates the verified 🎉ㆍverified-welcome channel (visible ONLY to verified members)
    */
   async getOrCreateVerifiedWelcomeChannel(guild) {
     const channels = await guild.channels.fetch();
@@ -141,10 +162,10 @@ module.exports = {
       c => c && c.type === ChannelType.GuildCategory && (c.name.toLowerCase().includes('important') || c.name.toLowerCase().includes('welcome'))
     );
 
-    // Look for channel named welcome that is designated for verified (or has everyone view denied)
+    // Look for channel named verified-welcome or topic containing arrivals
     let channel = channels.find(
-      c => c && c.type === ChannelType.GuildText && c.name === WELCOME_CHANNEL_NAME &&
-      (c.topic?.includes('arrivals') || c.permissionOverwrites.cache.get(everyoneRole.id)?.deny.has(PermissionFlagsBits.ViewChannel))
+      c => c && c.type === ChannelType.GuildText &&
+      (c.name === VERIFIED_WELCOME_CHANNEL_NAME || c.topic?.includes('arrivals') || (c.name.toLowerCase().includes('welcome') && c.id !== '1525420784103723079' && c.permissionOverwrites.cache.get(everyoneRole.id)?.deny.has(PermissionFlagsBits.ViewChannel)))
     );
 
     const overwrites = [
@@ -155,13 +176,19 @@ module.exports = {
       {
         id: verifiedRole.id,
         allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
-        deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions, PermissionFlagsBits.CreatePublicThreads]
+        deny: [
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.SendMessagesInThreads,
+          PermissionFlagsBits.CreatePublicThreads,
+          PermissionFlagsBits.CreatePrivateThreads,
+          PermissionFlagsBits.AddReactions
+        ]
       }
     ];
 
     if (!channel) {
       channel = await guild.channels.create({
-        name: WELCOME_CHANNEL_NAME,
+        name: VERIFIED_WELCOME_CHANNEL_NAME,
         type: ChannelType.GuildText,
         parent: category ? category.id : null,
         position: 2,
@@ -170,6 +197,9 @@ module.exports = {
         reason: 'Auto-creation of verified welcome channel'
       });
     } else {
+      if (channel.name !== VERIFIED_WELCOME_CHANNEL_NAME) {
+        await channel.setName(VERIFIED_WELCOME_CHANNEL_NAME, 'Rename verified welcome channel').catch(() => {});
+      }
       await channel.permissionOverwrites.set(overwrites).catch(() => {});
     }
 
@@ -227,12 +257,19 @@ module.exports = {
         continue;
       }
 
-      // 1. Verify Channel: Visible ONLY to unverified, hidden to verified
+      // 1. Verify Channel: Visible ONLY to unverified, strictly locked and hidden to verified
       if (isVerify) {
         await channel.permissionOverwrites.edit(everyoneRole, {
           ViewChannel: true,
           ReadMessageHistory: true,
-          SendMessages: false
+          SendMessages: false,
+          SendMessagesInThreads: false,
+          CreatePublicThreads: false,
+          CreatePrivateThreads: false,
+          AddReactions: false,
+          AttachFiles: false,
+          EmbedLinks: false,
+          UseApplicationCommands: false
         }).catch(() => {});
 
         await channel.permissionOverwrites.edit(verifiedRole, {
@@ -241,11 +278,19 @@ module.exports = {
         continue;
       }
 
-      // 2. Welcome Channels: check topic or permissions to distinguish unverified vs verified
-      if (channel.name === WELCOME_CHANNEL_NAME || chName.includes('welcome')) {
-        const isVerifiedWelcome = channel.topic?.includes('arrivals') || channel.permissionOverwrites.cache.get(everyoneRole.id)?.deny.has(PermissionFlagsBits.ViewChannel);
+      // 2. Welcome Channels: check topic or permissions or name to distinguish unverified vs verified
+      if (channel.name === UNVERIFIED_WELCOME_CHANNEL_NAME || channel.name === VERIFIED_WELCOME_CHANNEL_NAME || chName.includes('welcome')) {
+        const isVerifiedWelcome =
+          channel.name === VERIFIED_WELCOME_CHANNEL_NAME ||
+          channel.topic?.includes('arrivals') ||
+          (chName.includes('verified') && chName.includes('welcome')) ||
+          (channel.id !== '1525420784103723079' && channel.permissionOverwrites.cache.get(everyoneRole.id)?.deny.has(PermissionFlagsBits.ViewChannel));
 
         if (isVerifiedWelcome) {
+          if (channel.name !== VERIFIED_WELCOME_CHANNEL_NAME) {
+            await channel.setName(VERIFIED_WELCOME_CHANNEL_NAME, 'Rename verified welcome channel').catch(() => {});
+          }
+
           // Verified welcome channel: visible ONLY to verified
           await channel.permissionOverwrites.edit(everyoneRole, {
             ViewChannel: false
@@ -254,14 +299,25 @@ module.exports = {
           await channel.permissionOverwrites.edit(verifiedRole, {
             ViewChannel: true,
             ReadMessageHistory: true,
-            SendMessages: false
+            SendMessages: false,
+            SendMessagesInThreads: false,
+            CreatePublicThreads: false,
+            CreatePrivateThreads: false,
+            AddReactions: false
           }).catch(() => {});
         } else {
-          // Unverified welcome channel: visible ONLY to unverified
+          // Unverified welcome channel: visible ONLY to unverified, strictly locked
           await channel.permissionOverwrites.edit(everyoneRole, {
             ViewChannel: true,
             ReadMessageHistory: true,
-            SendMessages: false
+            SendMessages: false,
+            SendMessagesInThreads: false,
+            CreatePublicThreads: false,
+            CreatePrivateThreads: false,
+            AddReactions: false,
+            AttachFiles: false,
+            EmbedLinks: false,
+            UseApplicationCommands: false
           }).catch(() => {});
 
           await channel.permissionOverwrites.edit(verifiedRole, {
