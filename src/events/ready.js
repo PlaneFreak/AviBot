@@ -204,6 +204,10 @@ module.exports = {
         // 15. Ensure Instagram Feed Channel in Important Category (directly below news)
         const instagramService = require('../services/instagramService');
         await instagramService.ensureInstagramChannel(guild).catch(() => {});
+
+        // 16. Ensure Leave Logs Channel in Staff Category (Admin-Only)
+        const leaveLogService = require('../services/leaveLogService');
+        await leaveLogService.getOrCreateLeaveLogChannel(guild).catch(() => {});
       } catch (err) {
         console.error(`Error applying channel configurations on ready for guild ${guild.id}:`, err.message);
       }

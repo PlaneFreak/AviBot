@@ -190,7 +190,24 @@ module.exports = {
             : null;
 
           const chOverwrites = [];
-          if (chDef.readOnly) {
+          if (chDef.adminOnly) {
+            chOverwrites.push({
+              id: everyoneRole.id,
+              deny: [PermissionFlagsBits.ViewChannel]
+            });
+            if (modRole) {
+              chOverwrites.push({
+                id: modRole.id,
+                deny: [PermissionFlagsBits.ViewChannel]
+              });
+            }
+            if (adminRole) {
+              chOverwrites.push({
+                id: adminRole.id,
+                allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory]
+              });
+            }
+          } else if (chDef.readOnly) {
             chOverwrites.push({
               id: everyoneRole.id,
               deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.CreatePublicThreads, PermissionFlagsBits.CreatePrivateThreads],

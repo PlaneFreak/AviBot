@@ -1,5 +1,6 @@
 const { Events } = require('discord.js');
 const inviteService = require('../services/inviteService');
+const leaveLogService = require('../services/leaveLogService');
 
 module.exports = {
   name: Events.GuildMemberRemove,
@@ -9,7 +10,14 @@ module.exports = {
     try {
       await inviteService.handleMemberLeave(member);
     } catch (err) {
-      console.error('Error in guildMemberRemove handler:', err);
+      console.error('Error in inviteService.handleMemberLeave:', err);
+    }
+
+    try {
+      await leaveLogService.logMemberLeave(member);
+    } catch (err) {
+      console.error('Error in leaveLogService.logMemberLeave:', err);
     }
   }
 };
+

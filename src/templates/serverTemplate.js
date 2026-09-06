@@ -46,7 +46,9 @@ module.exports = {
       afkVc: '1525420559410921503',
       staffNews: '1524792364214915324',
       staffChat: '1524792260363944118',
-      moderatorsChat: '1524792315414319125'
+      moderatorsChat: '1524792315414319125',
+      leaveLogs: null,
+      adminLogs: null
     }
   },
 
@@ -392,6 +394,18 @@ module.exports = {
           name: '⚖️ㆍappeals',
           type: ChannelType.GuildText,
           topic: 'Incoming user punishment appeals (Bans, Kicks, Timeouts) for review.'
+        },
+        {
+          name: '🚪ㆍleave-logs',
+          type: ChannelType.GuildText,
+          topic: 'Confidential Member Leave Logs. Only Server Administrators can view this channel.',
+          adminOnly: true
+        },
+        {
+          name: '🛡️ㆍadmin-logs',
+          type: ChannelType.GuildText,
+          topic: 'Confidential Admin Logs. Only Server Administrators can view this channel.',
+          adminOnly: true
         }
       ]
     }
