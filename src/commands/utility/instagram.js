@@ -13,7 +13,7 @@ module.exports = {
     .addSubcommand(sub =>
       sub
         .setName('post')
-        .setDescription('Publish an Instagram post to the Instagram channel with @everyone ping')
+        .setDescription('Publish an Instagram post to the Instagram channel')
         .addStringOption(opt =>
           opt
             .setName('url')
@@ -30,12 +30,6 @@ module.exports = {
           opt
             .setName('image_url')
             .setDescription('Direct image URL for image preview (optional)')
-            .setRequired(false)
-        )
-        .addBooleanOption(opt =>
-          opt
-            .setName('ping')
-            .setDescription('Whether to ping @everyone (default: True)')
             .setRequired(false)
         )
     )
@@ -71,14 +65,13 @@ module.exports = {
         const postUrl = interaction.options.getString('url');
         const caption = interaction.options.getString('caption') || '';
         const imageUrl = interaction.options.getString('image_url') || null;
-        const ping = interaction.options.getBoolean('ping') ?? true;
 
         const result = await instagramService.postInstagramUpdate(interaction.client, {
           postUrl,
           caption,
           imageUrl,
           author: config.instagram.username || 'eddm.a350.spotter',
-          pingEveryone: ping,
+          pingEveryone: false,
           guildId: guild.id,
           force: true // manual post overrides duplicate check
         });
@@ -86,7 +79,7 @@ module.exports = {
         if (result.success) {
           const channel = await instagramService.ensureInstagramChannel(guild);
           return interaction.editReply({
-            content: `✅ **Instagram post successfully published!**\nSent to <#${channel.id}> with ${ping ? '@everyone ping' : 'no ping'}.\n🔗 Post URL: <${postUrl}>`
+            content: `✅ **Instagram post successfully published!**\nSent to <#${channel.id}>.\n🔗 Post URL: <${postUrl}>`
           });
         } else if (result.skipped) {
           return interaction.editReply({

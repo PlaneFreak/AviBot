@@ -194,7 +194,7 @@ module.exports = {
   /**
    * Build Discord message payload for an Instagram post
    */
-  buildInstagramPayload({ postUrl, caption = '', imageUrl = null, author = null, pingEveryone = true }) {
+  buildInstagramPayload({ postUrl, caption = '', imageUrl = null, author = null, pingEveryone = false }) {
     const handle = author || config.instagram.username || 'eddm.a350.spotter';
     const content = pingEveryone ? '@everyone 📸 **New Instagram Post!**' : '📸 **New Instagram Post!**';
 
@@ -279,7 +279,7 @@ module.exports = {
     caption = '',
     imageUrl = null,
     author = null,
-    pingEveryone = true,
+    pingEveryone = false,
     guildId = null,
     force = false
   }) {
@@ -455,7 +455,7 @@ module.exports = {
               caption,
               imageUrl,
               author,
-              pingEveryone: true
+              pingEveryone: false
             });
 
             res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -561,7 +561,7 @@ module.exports = {
             postUrl: latest.url,
             caption: latest.caption,
             imageUrl: latest.imageUrl,
-            pingEveryone: true
+            pingEveryone: false
           });
         }
       }
