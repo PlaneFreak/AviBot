@@ -196,7 +196,7 @@ module.exports = {
    */
   buildInstagramPayload({ postUrl, caption = '', imageUrl = null, author = null, pingEveryone = true }) {
     const handle = author || config.instagram.username || 'eddm.a350.spotter';
-    const content = pingEveryone ? '@everyone 📸 **Neuer Instagram Post!**' : '📸 **Neuer Instagram Post!**';
+    const content = pingEveryone ? '@everyone 📸 **New Instagram Post!**' : '📸 **New Instagram Post!**';
 
     // Format caption cleanly (trim if too long)
     let cleanCaption = (caption || '').trim();
@@ -205,10 +205,10 @@ module.exports = {
     }
 
     // Components V2 layout
-    const sectionText = `## 📸 Neuer Instagram Beitrag\n` +
-      (handle ? `Von **@${handle}**\n\n` : '\n') +
+    const sectionText = `## 📸 New Instagram Post\n` +
+      (handle ? `By **@${handle}**\n\n` : '\n') +
       (cleanCaption ? `${cleanCaption}\n\n` : '') +
-      `🔗 [Auf Instagram ansehen](${postUrl})`;
+      `🔗 [View on Instagram](${postUrl})`;
 
     const containerComponents = [
       componentsV2.createSection({ text: sectionText })
@@ -222,7 +222,7 @@ module.exports = {
 
     const actionRow = componentsV2.createActionRow([
       componentsV2.createButton({
-        label: 'Auf Instagram ansehen',
+        label: 'View on Instagram',
         url: postUrl,
         emoji: '📸'
       })
@@ -242,9 +242,9 @@ module.exports = {
         iconURL: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Instagram_icon.png/600px-Instagram_icon.png',
         url: postUrl
       })
-      .setTitle('📸 Neuer Instagram Beitrag!')
+      .setTitle('📸 New Instagram Post!')
       .setURL(postUrl)
-      .setDescription(cleanCaption || 'Schaut euch den neuesten Post auf Instagram an!')
+      .setDescription(cleanCaption || 'Check out the latest post on Instagram!')
       .setFooter({ text: `${config.footerText} • Instagram Feed` })
       .setTimestamp();
 
@@ -254,7 +254,7 @@ module.exports = {
 
     const legacyRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setLabel('Auf Instagram ansehen')
+        .setLabel('View on Instagram')
         .setStyle(ButtonStyle.Link)
         .setURL(postUrl)
         .setEmoji('📸')

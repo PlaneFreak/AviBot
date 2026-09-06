@@ -90,11 +90,11 @@ module.exports = {
           });
         } else if (result.skipped) {
           return interaction.editReply({
-            content: `ℹ️ Dieser Post wurde bereits zuvor im Kanal geteilt!`
+            content: `ℹ️ This post has already been shared in the channel!`
           });
         } else {
           return interaction.editReply({
-            content: `❌ Fehler beim Veröffentlichen des Instagram-Posts. Bitte überprüfe die Bot-Rechte.`
+            content: `❌ Failed to publish Instagram post. Please check bot permissions.`
           });
         }
       }
@@ -103,14 +103,14 @@ module.exports = {
         const channel = await instagramService.ensureInstagramChannel(guild);
         if (!channel) {
           return interaction.editReply({
-            content: `❌ Konnte den Kanal \`📸ㆍinstagram\` in der Kategorie **Important** nicht finden oder erstellen.`
+            content: `❌ Could not find or create the \`📸ㆍinstagram\` channel in the **Important** category.`
           });
         }
 
         const testUrl = `https://www.instagram.com/${config.instagram.username || 'eddm.a350.spotter'}/`;
         const testResult = await instagramService.postInstagramUpdate(interaction.client, {
           postUrl: testUrl,
-          caption: '🛫 Dies ist ein automatischer Test-Post zur Überprüfung des Instagram-Kanals in der Kategorie **Important** (unter news).',
+          caption: '🛫 This is an automated test post to verify the Instagram feed channel in the **Important** category (under news).',
           author: config.instagram.username || 'eddm.a350.spotter',
           pingEveryone: false,
           guildId: guild.id,
@@ -118,33 +118,33 @@ module.exports = {
         });
 
         return interaction.editReply({
-          content: `✅ **Test erfolgreich!**\nEine Testnachricht wurde in <#${channel.id}> ohne @everyone-Ping gepostet.`
+          content: `✅ **Test successful!**\nA test preview was posted to <#${channel.id}> without @everyone ping.`
         });
       }
 
       if (sub === 'status') {
         const channel = await instagramService.ensureInstagramChannel(guild);
         const username = config.instagram.username || 'eddm.a350.spotter';
-        const webhookPort = config.instagram.webhookPort || 3000;
+        const webhookPort = config.instagram.webhookPort || 3050;
         const hasSecret = !!config.instagram.webhookSecret;
-        const rssUrl = config.instagram.rssUrl || 'Keine (deaktiviert)';
+        const rssUrl = config.instagram.rssUrl || 'None (disabled)';
 
         const statusMsg = `## 📸 Instagram Integration Status\n\n` +
           `• **Instagram Account:** \`@${username}\` (<https://www.instagram.com/${username}/>)\n` +
-          `• **Kanal:** ${channel ? `<#${channel.id}> (\`${channel.name}\`)` : '⚠️ Nicht gefunden'}\n` +
-          `• **Position:** Kategorie **Important** (direkt unter news)\n` +
+          `• **Channel:** ${channel ? `<#${channel.id}> (\`${channel.name}\`)` : '⚠️ Not found'}\n` +
+          `• **Position:** **Important** category (directly under news)\n` +
           `• **Webhook Port:** \`${webhookPort}\`\n` +
-          `• **Webhook Endpunkt:** \`POST http://<SERVER_IP>:${webhookPort}/api/instagram\`\n` +
-          `• **Webhook Secret:** ${hasSecret ? '🔒 Aktiviert' : '🔓 Keine (offen)'}\n` +
+          `• **Webhook Endpoint:** \`POST http://<SERVER_IP>:${webhookPort}/api/instagram\`\n` +
+          `• **Webhook Secret:** ${hasSecret ? '🔒 Enabled' : '🔓 None (open)'}\n` +
           `• **RSS Feed URL:** \`${rssUrl}\`\n\n` +
-          `*Tipp: Du kannst jederzeit manuell mit \`/instagram post <url>\` einen Beitrag mit @everyone veröffentlichen!*`;
+          `*Tip: You can manually publish a post with @everyone anytime using \`/instagram post <url>\`!*`;
 
         return interaction.editReply({ content: statusMsg });
       }
     } catch (err) {
       console.error('Error in /instagram command:', err);
       return interaction.editReply({
-        content: `❌ Fehler bei der Ausführung: ${err.message}`
+        content: `❌ Execution error: ${err.message}`
       });
     }
   }
